@@ -3,6 +3,7 @@
 {if $allOk === true}
 <style>
 #ssl-config-wrap { max-width: 700px; margin: 0 auto; text-align: left; }
+
 #ssl-config-wrap h2 { font-size: 22px; font-weight: 400; text-align: center; margin-bottom: 20px; }
 #ssl-config-wrap .ssl-install-toggle { text-align: center; margin-bottom: 25px; }
 #ssl-config-wrap .ssl-install-toggle .btn { min-width: 160px; }
@@ -28,30 +29,106 @@
 #ssl-config-wrap #manual_own_csr { font-family: monospace; font-size: 12px; resize: vertical; }
 #ssl-result-wrap { max-width: 700px; margin: 0 auto; text-align: left; }
 #ssl-result-wrap #ssl-private-key { font-family: monospace; font-size: 12px; }
+/* the form keeps its fields; its sections get the card look of the other product pages */
+#ssl-config-wrap { max-width: 860px; }
+#ssl-config-wrap #section-autoinstall, #ssl-config-wrap #section-manual, #ssl-config-wrap .ssl-csr-section,
+#ssl-config-wrap .ssl-contact-section, #ssl-config-wrap .ssl-agreement-section {
+    background: #fff; border: 1px solid #e6e8eb; border-radius: 10px; padding: 18px 20px; margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.04);
+}
+#ssl-config-wrap .ssl-section-title, #ssl-config-wrap .ssl-contact-section h3, #ssl-config-wrap .ssl-csr-section h3 {
+    font-size: 15px; font-weight: 600; letter-spacing: .01em; margin: 0 0 10px; padding-bottom: 10px;
+    border-bottom: 1px solid #eef0f2;
+}
 </style>
 
-<div id="ssl-config-wrap">
-    <h2>{$MGLANG->T('sslConfigGenerateCertTitle')} {$productName|escape}</h2>
-
-    {* Install type toggle - only when the client has a reachable cPanel account *}
-    {if $hasCpanel}
-    <div class="ssl-install-toggle">
-        <div class="btn-group" role="group">
-            <button type="button" class="btn btn-success" id="btn-autoinstall">
-                <span class="glyphicon glyphicon-ok"></span> {$MGLANG->T('sslConfigAutoinstall')}
-            </button>
-            <button type="button" class="btn btn-default" id="btn-manual">
-                {$MGLANG->T('sslConfigManual')}
-            </button>
+<div id="ssl-config-wrap" class="validate-ssl-unified tss-cert tss-smime">
+    <section class="tss-card tss-hero tss-hero--wait">
+        <div class="tss-hero__head">
+            <span class="tss-hero__icon">
+                <svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            </span>
+            <div class="tss-hero__title">
+                <span class="tss-badge tss-badge--wait">
+                    <svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                    {$MGLANG->T('smimeAwaitingOrder')}
+                </span>
+                <h3>{$productName|escape}</h3>
+                {if $productGroup || $serviceState}
+                    <p class="tss-hero__domain">{if $productGroup}{$productGroup|escape}{/if}{if $productGroup && $serviceState} &middot; {/if}{if $serviceState}{$serviceState|escape}{/if}</p>
+                {/if}
+            </div>
         </div>
-    </div>
+        {* where the order stands: paid, the client's details, then the certificate authority's part *}
+        <div class="tss-steps">
+            <span class="tss-step tss-step--done">
+                <span class="tss-step__n"><svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span>
+                {$MGLANG->T('sslStepPaid')}
+            </span>
+            <span class="tss-step tss-step--current"><span class="tss-step__n">2</span> {$MGLANG->T('sslStepDetails')}</span>
+            <span class="tss-step"><span class="tss-step__n">3</span> {$MGLANG->T('sslStepValidate')}</span>
+            <span class="tss-step"><span class="tss-step__n">4</span> {$MGLANG->T('sslStepIssued')}</span>
+        </div>
+        <div class="tss-hero__foot">
+            <p>{$MGLANG->T('sslConfigIntro')}</p>
+        </div>
+    </section>
+
+    {if $billing}
+    <section class="tss-card">
+        <h4 class="tss-card__title">
+            <svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></svg>
+            {$MGLANG->T('validation_page', 'cardBilling')}
+        </h4>
+        <div class="tss-grid tss-grid--flush">
+            <dl class="tss-dl">
+                <dt>{$MGLANG->T('validation_page', 'RegistrationDate')}</dt><dd>{if $billing.registration}{$billing.registration}{else}-{/if}</dd>
+                <dt>{$MGLANG->T('validation_page', 'ReccuringAmount')}</dt><dd>{$billing.amount}</dd>
+                <dt>{$MGLANG->T('validation_page', 'PaymentMethod')}</dt><dd>{$billing.paymentMethod|escape}</dd>
+            </dl>
+            <dl class="tss-dl">
+                <dt>{$MGLANG->T('smimeNextDue')}</dt><dd>{if $billing.nextDue}{$billing.nextDue}{else}-{/if}</dd>
+                <dt>{$MGLANG->T('validation_page', 'BillingCycle')}</dt><dd>{$billing.cycle|escape}</dd>
+            </dl>
+        </div>
+    </section>
+    {/if}
+
+    {* How the certificate is installed - only when the client has a reachable cPanel account *}
+    {if $hasCpanel}
+    <section class="tss-card">
+        <h4 class="tss-card__title">
+            <svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg>
+            {$MGLANG->T('sslConfigInstallQuestion')}
+        </h4>
+        <div class="tss-form">
+            <div class="tss-choice">
+                <button type="button" id="btn-autoinstall" class="tss-choice__item is-selected">
+                    <svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg>
+                    <span class="tss-choice__body">
+                        <strong>{$MGLANG->T('sslConfigAutoinstall')}</strong>
+                        <span>{$MGLANG->T('sslConfigAutoinstallHint')}</span>
+                    </span>
+                    <span class="tss-choice__mark"><svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span>
+                </button>
+                <button type="button" id="btn-manual" class="tss-choice__item">
+                    <svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                    <span class="tss-choice__body">
+                        <strong>{$MGLANG->T('sslConfigManual')}</strong>
+                        <span>{$MGLANG->T('sslConfigManualHint')}</span>
+                    </span>
+                    <span class="tss-choice__mark"><svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span>
+                </button>
+            </div>
+        </div>
+    </section>
     {/if}
     <input type="hidden" id="install_type" value="{if $hasCpanel}autoinstall{else}manual{/if}">
 
     {* ===== AUTOINSTALL SECTION ===== *}
     {if $hasCpanel}
     <div id="section-autoinstall">
-        <h3 class="ssl-section-title">{$MGLANG->T('sslConfigServerInfoTitle')}</h3>
+        <h3 class="ssl-section-title"><span class="tss-step__n">1</span> {$MGLANG->T('sslConfigServerInfoTitle')}</h3>
         <p class="ssl-section-sub">{$MGLANG->T('sslConfigServerInfoText')}</p>
 
         <div class="form-group">
@@ -225,7 +302,7 @@
 
     {* ===== CSR DETAILS (only when the CSR is generated by the module) ===== *}
     <div class="ssl-csr-section" id="ssl-csr-section" {if !$hasCpanel}style="display:none;"{/if}>
-        <h3>{$MGLANG->T('sslConfigCsrSection')}</h3>
+        <h3><span class="tss-step__n">2</span> {$MGLANG->T('sslConfigCsrSection')}</h3>
         <p class="csr-sub">{$MGLANG->T('sslConfigCsrSubtext')}</p>
 
         <div class="form-group">
@@ -261,7 +338,7 @@
     {* ===== ADMIN CONTACT ===== *}
     {if !$adminFormHidden}
     <div class="ssl-contact-section">
-        <h3 style="margin-bottom:15px;">{$MGLANG->T('sslConfigAdminContact')}</h3>
+        <h3 style="margin-bottom:15px;"><span class="tss-step__n">3</span> {$MGLANG->T('sslConfigAdminContact')}</h3>
         <div class="row">
             <div class="col-md-6">
                 <div class="form-group">
@@ -326,7 +403,11 @@
     {/if}
 
     <div style="margin-top:25px; padding-top:15px; border-top:1px solid #e0e0e0;">
-        <button type="button" class="btn btn-primary btn-lg" id="btn-submit-ssl-config">{$MGLANG->T('sslConfigSubmit')}</button>
+        <button type="button" class="tss-btn tss-btn--primary" id="btn-submit-ssl-config">{$MGLANG->T('sslConfigSubmit')}</button>
+        <span class="tss-required">
+            <svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            {$MGLANG->T('sslConfigRequiredNote')}
+        </span>
     </div>
 </div>
 
@@ -436,8 +517,9 @@
 
     function switchToAutoinstall() {
         $('#install_type').val('autoinstall');
-        $('#btn-autoinstall').addClass('btn-success').removeClass('btn-default');
-        $('#btn-manual').addClass('btn-default').removeClass('btn-success');
+        // the two choices are cards now: the selected one is marked
+        $('#btn-autoinstall').addClass('is-selected');
+        $('#btn-manual').removeClass('is-selected');
         $('#section-autoinstall').show();
         $('#section-manual').hide();
         $('#ssl-csr-section').show();
@@ -445,8 +527,8 @@
 
     function switchToManual() {
         $('#install_type').val('manual');
-        $('#btn-manual').addClass('btn-success').removeClass('btn-default');
-        $('#btn-autoinstall').addClass('btn-default').removeClass('btn-success');
+        $('#btn-manual').addClass('is-selected');
+        $('#btn-autoinstall').removeClass('is-selected');
         $('#section-autoinstall').hide();
         $('#section-manual').show();
         if ($('#main_domain').val() === '__manual__') {
@@ -823,5 +905,21 @@
     }
 
 }(jQuery));
+</script>
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        var block  = $('#mg-wrapper');
+        var target = $('.product-details');
+        if (!block.length || !target.length) {
+            return;
+        }
+        // the module's stylesheet sits outside the block and has to survive the clean-up below
+        $('head').append($('link[href*="theme.css"]').first());
+        // the whole block is moved, not copied, so every handler bound above stays on its node
+        target.empty().append(block);
+        // WHMCS's own tab strip under the page: the module shows everything above it
+        target.closest('.tab-pane').find('> .nav-tabs, > .tab-content').remove();
+    });
 </script>
 {/if}

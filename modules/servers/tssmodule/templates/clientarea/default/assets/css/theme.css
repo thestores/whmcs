@@ -153,6 +153,12 @@ table.table-validation-details td.break-all {
     --c-red: #b42318;
     --c-surface: #ffffff;
     --c-subtle: #f7f9f8;
+    /* the waiting / warning / failed tones: every page that shows a state needs them, not only S/MIME */
+    --c-amber: #b54708;
+    --c-amber-tint: #fef6e7;
+    --c-amber-soft: #fbe3b8;
+    --c-red-tint: #fdf0ef;
+    --c-red-soft: #f6cfcb;
     container-type: inline-size;
     color: var(--c-text);
     text-align: left;
@@ -313,3 +319,30 @@ table.table-validation-details td.break-all {
 .tss-check + .tss-check { margin-top: 6px; }
 .tss-form > .tss-check { margin-top: 4px; }
 .tss-form > .tss-fields[data-tss-cs-address] { margin-top: 14px; }
+
+/* ===== Enrolment: the four steps of an order, and the way the certificate is installed ===== */
+.tss-steps { display: flex; flex-wrap: wrap; gap: 8px 22px; padding: 14px 20px; border-top: 1px solid var(--c-green-soft); }
+.tss-hero--wait .tss-steps, .tss-hero--warn .tss-steps { border-top-color: var(--c-amber-soft); }
+.tss-step { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--c-muted); }
+.tss-step__n { width: 20px; height: 20px; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; background: #fff; border: 1px solid var(--c-border); color: var(--c-muted); }
+.tss-step--done { color: var(--c-green-dark); }
+.tss-step--done .tss-step__n { background: var(--c-green); border-color: var(--c-green); color: #fff; }
+.tss-step--current { color: var(--c-text); font-weight: 600; }
+.tss-step--current .tss-step__n { background: var(--c-amber); border-color: var(--c-amber); color: #fff; }
+.tss-step .tss-ic { width: 12px; height: 12px; }
+
+.tss-choice { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.tss-choice__item { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border: 1px solid var(--c-border); border-radius: 10px; background: var(--c-surface); cursor: pointer; text-align: left; width: 100%; }
+.tss-choice__item:hover { border-color: var(--c-green-soft); }
+.tss-choice__item.is-selected { border-color: var(--c-green); background: var(--c-green-tint); }
+.tss-choice__item .tss-ic { width: 20px; height: 20px; color: var(--c-green); margin-top: 2px; }
+.tss-choice__body { min-width: 0; }
+.tss-choice__body strong { display: block; font-size: 14px; margin-bottom: 2px; color: var(--c-text); }
+.tss-choice__body span { font-size: 12.5px; color: var(--c-muted); line-height: 1.4; }
+.tss-choice__mark { margin-left: auto; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--c-border); flex: none; display: inline-flex; align-items: center; justify-content: center; background: #fff; }
+.tss-choice__item.is-selected .tss-choice__mark { background: var(--c-green); border-color: var(--c-green); color: #fff; }
+.tss-choice__item:not(.is-selected) .tss-choice__mark .tss-ic { display: none; }
+.tss-choice__mark .tss-ic { width: 13px; height: 13px; color: #fff; }
+.tss-required { font-size: 12.5px; color: var(--c-muted); display: inline-flex; align-items: center; gap: 6px; }
+.tss-grid--flush { padding: 14px 20px 2px; gap: 0 28px; }
+.tss-grid--flush .tss-dl { margin: 0; padding: 0; }
