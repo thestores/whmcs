@@ -7,6 +7,7 @@ use ModulesGarden\tssmodule\App\Libs\Commissions;
 use ModulesGarden\tssmodule\App\Libs\Edition;
 use ModulesGarden\tssmodule\App\Models\RemoteProduct;
 use ModulesGarden\tssmodule\App\Repositories\Whmcs\AddonModuleRepository;
+use ModulesGarden\tssmodule\App\Libs\GatewayOrderService;
 use WHMCS\Database\Capsule;
 
 /**
@@ -237,7 +238,7 @@ class Writer
             Capsule::table('tblsslorders')->where('id', $rec['ssl_order_id'])->update($update);
 
             // remove any unified rows a previous attempt left behind
-            Capsule::table(self::T_REQUESTS)->where('serviceid', $rec['service_id'])->whereIn('name', ['addOrder', 'certificate', 'autoinstall', 'renewOrder', 'smime', 'codesigning', 'codeguard'])->delete();
+            Capsule::table(self::T_REQUESTS)->where('serviceid', $rec['service_id'])->whereIn('name', array_merge(['addOrder', 'certificate', 'autoinstall', 'renewOrder'], GatewayOrderService::requestNames()))->delete();
 
             $prices = (array)($rec['prices'] ?? []);
             $api    = (float)($prices['api_price'] ?? 0);

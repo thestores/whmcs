@@ -3,6 +3,7 @@
 namespace ModulesGarden\tssmodule\App\Libs;
 
 use ModulesGarden\tssmodule\App\Models\AcmeSubscription;
+use ModulesGarden\tssmodule\App\Models\AcmeSubscriptionDomain;
 use ModulesGarden\tssmodule\App\Models\AisSubscription;
 use WHMCS\Database\Capsule;
 
@@ -43,12 +44,93 @@ class SubscriptionBilling
         return $date ?: (string)Capsule::table('tblhosting')->where('id', (int)$serviceId)->value('regdate');
     }
 
-    /** bought domain slots can be given back only within REFUND_DAYS of their purchase */
-    public static function canReduceSlots($serviceId)
+    /**
+     * How many bought domain slots can be given back right now, per type ['single' => n, 'wildcard' => n].
+     *
+     * A slot costs nothing at the vendor until a domain is put in it, so an empty slot can be given back at any time,
+     * however long ago it was paid for. A slot that holds a domain can only be given back while the vendor would still
+     * refund that domain - it refunds a removal within REFUND_DAYS of the domain's own addition date, not of the day
+     * the slot was paid for.
+     */
+    public static function refundableSlots($serviceId)
     {
-        $date = self::lastSlotPurchase($serviceId);
+        $bought = self::boughtSlots($serviceId);
+        $since  = date('Y-m-d H:i:s', strtotime('-' . self::REFUND_DAYS . ' days'));
+        $result = ['single' => 0, 'wildcard' => 0];
 
-        return $date !== '' && $date !== '0000-00-00' && strtotime($date) >= strtotime('-' . self::REFUND_DAYS . ' days', strtotime(date('Y-m-d')));
+        foreach(['single', 'wildcard'] as $type)
+        {
+            $domains = AcmeSubscriptionDomain::where('service_id', (int)$serviceId)
+                ->where('status', 'added')
+                ->where('domain_type', $type === 'wildcard' ? 'wildcard' : 'single')
+                ->get(['added_at', 'created_at']);
+
+            $used   = count($domains);
+            $recent = 0;
+            foreach($domains as $domain)
+            {
+                $added = (string)($domain->added_at ?: $domain->created_at);
+                if($added !== '' && strpos($added, '0000-00-00') !== 0 && $added >= $since)
+                {
+                    $recent++;
+                }
+            }
+            // the empty slots, plus the ones whose domain the vendor would still refund
+            $result[$type] = max(0, $bought[$type] - $used) + $recent;
+        }
+
+        return $result;
+    }
+
+    /** domains the subscription actually holds right now, per type */
+    public static function activeDomains($serviceId)
+    {
+        $counts = ['single' => 0, 'wildcard' => 0];
+        foreach(AcmeSubscriptionDomain::where('service_id', (int)$serviceId)->where('status', 'added')->get(['domain_type']) as $domain)
+        {
+            $counts[(string)$domain->domain_type === 'wildcard' ? 'wildcard' : 'single']++;
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Domain slots a renewal is charged for, per type: the domains in use beyond what the product already includes.
+     * A slot the client bought but never put a domain in is not renewed - the vendor charges per domain, so there is
+     * nothing to pay for it - and it does not carry over into the next period (renewalPaid trims it).
+     */
+    public static function chargeableSlots($serviceId)
+    {
+        $packageId = (int)Capsule::table('tblhosting')->where('id', (int)$serviceId)->value('packageid');
+        $product   = Capsule::table('tblproducts')->where('id', $packageId)->first(['configoption7', 'configoption8']);
+        $included  = ['single' => (int)($product->configoption7 ?? 0), 'wildcard' => (int)($product->configoption8 ?? 0)];
+        $active    = self::activeDomains($serviceId);
+
+        return [
+            'single'   => max(0, $active['single'] - $included['single']),
+            'wildcard' => max(0, $active['wildcard'] - $included['wildcard']),
+        ];
+    }
+
+    /** domain slots the client has paid for, per type (the configurable options of the service) */
+    public static function boughtSlots($serviceId)
+    {
+        $slots = ['single' => 0, 'wildcard' => 0];
+        $rows  = Capsule::table('tblhostingconfigoptions')
+            ->join('tblproductconfigoptions', 'tblproductconfigoptions.id', '=', 'tblhostingconfigoptions.configid')
+            ->where('tblhostingconfigoptions.relid', (int)$serviceId)
+            ->get(['tblproductconfigoptions.optionname', 'tblhostingconfigoptions.qty']);
+
+        foreach($rows as $row)
+        {
+            $name = explode('|', (string)$row->optionname)[0];
+            if($name === 'sans' || $name === 'sans_wildcard')
+            {
+                $slots[$name === 'sans_wildcard' ? 'wildcard' : 'single'] += (int)$row->qty;
+            }
+        }
+
+        return $slots;
     }
 
     /**
@@ -85,15 +167,11 @@ class SubscriptionBilling
                 ->get(['tblinvoiceitems.*'])
                 ->all());
         }
-        // domains bought on the module's invoice ("Buy more domains")
-        $items = array_merge($items, Capsule::table('tblinvoiceitems')
-            ->join('tblinvoices', 'tblinvoices.id', '=', 'tblinvoiceitems.invoiceid')
-            ->where('tblinvoiceitems.type', self::SLOT_PURCHASE)
-            ->where('tblinvoiceitems.relid', (int)$serviceId)
-            ->where('tblinvoices.status', 'Paid')
-            ->where('tblinvoices.datepaid', '>', $since)
-            ->get(['tblinvoiceitems.*'])
-            ->all());
+        // Domains bought on the module's invoice ("Buy more domains"). These do not follow the invoice date: a slot
+        // costs nothing at the vendor until a domain goes into it, so an unused slot is refundable whenever, and a
+        // used one only while the vendor would still refund that domain. refundableSlots() counts both; the newest
+        // purchases are credited first, up to that count.
+        $items = array_merge($items, self::refundableSlotItems($serviceId));
 
         $byInvoice = [];
         foreach($items as $item)
@@ -135,6 +213,71 @@ class SubscriptionBilling
         }
 
         return round($credited, 2);
+    }
+
+    /**
+     * The paid "buy more domains" items that are still refundable, newest purchase first, cut off when the refundable
+     * slots of that type are used up. An item that covers more slots than are left refundable is credited in part.
+     *
+     * @return array invoice item rows (the partly refundable one carries a reduced amount)
+     */
+    protected static function refundableSlotItems($serviceId)
+    {
+        $left = self::refundableSlots($serviceId);
+
+        // what each purchase bought, from the row the module wrote with the invoice (not from the invoice wording)
+        $purchases = [];
+        foreach(\ModulesGarden\tssmodule\App\Models\Request::where('serviceid', (int)$serviceId)->where('name', self::SLOT_PURCHASE)->get() as $row)
+        {
+            $data      = json_decode((string)$row->request, true) ?: [];
+            $invoiceId = (int)($data['invoice'] ?? 0);
+            if(!$invoiceId)
+            {
+                continue;
+            }
+            $slots = ['single' => 0, 'wildcard' => 0];
+            foreach((array)($data['bought'] ?? []) as $configId => $count)
+            {
+                $name = explode('|', (string)Capsule::table('tblproductconfigoptions')->where('id', (int)$configId)->value('optionname'))[0];
+                $slots[$name === 'sans_wildcard' ? 'wildcard' : 'single'] += (int)$count;
+            }
+            $purchases[$invoiceId] = $slots;
+        }
+        if(!$purchases)
+        {
+            return [];
+        }
+
+        // newest purchase first: the client gives back what they bought last
+        $paid = Capsule::table('tblinvoices')->whereIn('id', array_keys($purchases))->where('status', 'Paid')->orderBy('datepaid', 'desc')->pluck('id')->all();
+
+        $refundable = [];
+        foreach($paid as $invoiceId)
+        {
+            $slots   = $purchases[(int)$invoiceId];
+            $total   = $slots['single'] + $slots['wildcard'];
+            $covered = min($slots['single'], $left['single']) + min($slots['wildcard'], $left['wildcard']);
+            if($total <= 0 || $covered <= 0)
+            {
+                continue;
+            }
+            $left['single']   -= min($slots['single'], $left['single']);
+            $left['wildcard'] -= min($slots['wildcard'], $left['wildcard']);
+
+            $items = Capsule::table('tblinvoiceitems')->where('invoiceid', (int)$invoiceId)->where('type', self::SLOT_PURCHASE)->get()->all();
+            foreach($items as $item)
+            {
+                if($covered < $total)
+                {
+                    // only part of this purchase can still be given back
+                    $item         = clone $item;
+                    $item->amount = round((float)$item->amount / $total * $covered, 2);
+                }
+                $refundable[] = $item;
+            }
+        }
+
+        return $refundable;
     }
 
     protected static function alreadyCredited($clientId, $invoiceId)
@@ -206,17 +349,22 @@ class SubscriptionBilling
             return $value > 0 ? $value : ($row && (float)$row->annually > 0 ? (float)$row->annually : 0.0);
         };
 
-        $amount = $price('product', $service->packageid);
+        // only the domains the subscription really holds are renewed: a slot the client bought but never used costs
+        // nothing at the vendor and is not carried into the next period
+        $amount     = $price('product', $service->packageid);
+        $chargeable = self::chargeableSlots($serviceId);
         foreach(Capsule::table('tblhostingconfigoptions')
             ->join('tblproductconfigoptions', 'tblproductconfigoptions.id', '=', 'tblhostingconfigoptions.configid')
             ->where('tblhostingconfigoptions.relid', (int)$serviceId)
             ->where('tblproductconfigoptions.optiontype', 4)
-            ->get(['tblhostingconfigoptions.configid', 'tblhostingconfigoptions.qty']) as $option)
+            ->get(['tblhostingconfigoptions.configid', 'tblproductconfigoptions.optionname']) as $option)
         {
-            $sub = (int)Capsule::table('tblproductconfigoptionssub')->where('configid', (int)$option->configid)->orderBy('sortorder')->value('id');
-            if($sub && (int)$option->qty > 0)
+            $name = explode('|', (string)$option->optionname)[0];
+            $qty  = $name === 'sans_wildcard' ? $chargeable['wildcard'] : ($name === 'sans' ? $chargeable['single'] : 0);
+            $sub  = $qty > 0 ? (int)Capsule::table('tblproductconfigoptionssub')->where('configid', (int)$option->configid)->orderBy('sortorder')->value('id') : 0;
+            if($sub)
             {
-                $amount += (int)$option->qty * $price('configoptions', $sub);
+                $amount += $qty * $price('configoptions', $sub);
             }
         }
 
@@ -236,23 +384,14 @@ class SubscriptionBilling
     }
 
     /**
-     * ACME: the client bought more domain slots (configurable option upgrade, paid) - the same number is bought at the
-     * vendor (gateway "add-san" of the subscription)
+     * Nothing is bought at the vendor when the client pays for more domain slots: the vendor charges per domain the
+     * moment it is added to the subscription (POST /certificates/caas/{id}/domains), and the client area lets the
+     * client add only as many as the paid configurable options allow. The slots are the client-facing quota, the
+     * vendor charge follows the domain.
+     *
+     * (An earlier version called the gateway's "add-san" here, which exists for TLS certificates only - a subscription
+     * answers 404 - so the call never did anything but log an error.)
      */
-    public static function buyAcmeSlots($serviceId, $single, $wildcard)
-    {
-        $single       = max(0, (int)$single);
-        $wildcard     = max(0, (int)$wildcard);
-        $subscription = AcmeSubscription::getByServiceId($serviceId);
-        if((!$single && !$wildcard) || !$subscription || (int)$subscription->acme_id <= 0 || in_array($subscription->status, ['cancelled', 'terminated'], true))
-        {
-            return false;
-        }
-        CertificateService::api($serviceId)->addSan((int)$subscription->acme_id, ['single_san' => $single, 'wildcard_san' => $wildcard]);
-        CertificateService::event($serviceId, 'success', '[Subscription] Additional domains bought: ' . $single . ' single, ' . $wildcard . ' wildcard');
-
-        return true;
-    }
 
     /** Settings > SSL > Subscriptions: domain slots bought during the period are charged for the days left ("prorated") or at the yearly price ("full") */
     const SLOT_PRICING_PRORATED = 'prorated';
@@ -442,8 +581,8 @@ class SubscriptionBilling
     }
 
     /**
-     * Adds bought domain slots to the service (configurable option quantity), buys them at the vendor, and brings an
-     * unpaid renewal invoice up to date
+     * Adds bought domain slots to the service (configurable option quantity). Nothing is ordered at the vendor here:
+     * it charges per domain when the client adds one to the subscription.
      */
     protected static function addSlots($serviceId, array $bought)
     {
@@ -463,15 +602,7 @@ class SubscriptionBilling
             $type = explode('|', (string)Capsule::table('tblproductconfigoptions')->where('id', (int)$configId)->value('optionname'))[0];
             $added[$type === 'sans_wildcard' ? 'wildcard' : 'single'] += (int)$count;
         }
-        CertificateService::event($serviceId, 'success', '[Subscription] Domains added: ' . $added['single'] . ' single, ' . $added['wildcard'] . ' wildcard');
-        try
-        {
-            self::buyAcmeSlots($serviceId, $added['single'], $added['wildcard']);
-        }
-        catch(\Throwable $e)
-        {
-            CertificateService::event($serviceId, 'error', '[Subscription] The domains could not be bought at the vendor: ' . $e->getMessage());
-        }
+        CertificateService::event($serviceId, 'success', '[Subscription] Domain slots added: ' . $added['single'] . ' single, ' . $added['wildcard'] . ' wildcard (the vendor charges when a domain is added to the subscription)');
     }
 
     /**
@@ -499,12 +630,44 @@ class SubscriptionBilling
             $subscription->period_end   = $next;
             $subscription->save();
             Capsule::table('tblhosting')->where('id', (int)$serviceId)->update(['nextduedate' => $next, 'nextinvoicedate' => $next]);
+            self::trimUnusedSlots($serviceId);
             CertificateService::event($serviceId, 'success', '[Subscription] Renewal invoice #' . (int)$invoiceId . ' paid: renewed until ' . $next);
 
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * A renewal only renews the domains in use: slots the client bought but never put a domain in are not carried
+     * into the new period (they were not charged for either), so the service keeps exactly the slots it uses.
+     */
+    protected static function trimUnusedSlots($serviceId)
+    {
+        $chargeable = self::chargeableSlots($serviceId);
+        $trimmed    = [];
+        foreach(Capsule::table('tblhostingconfigoptions')
+            ->join('tblproductconfigoptions', 'tblproductconfigoptions.id', '=', 'tblhostingconfigoptions.configid')
+            ->where('tblhostingconfigoptions.relid', (int)$serviceId)
+            ->get(['tblhostingconfigoptions.configid', 'tblhostingconfigoptions.qty', 'tblproductconfigoptions.optionname']) as $option)
+        {
+            $name = explode('|', (string)$option->optionname)[0];
+            if($name !== 'sans' && $name !== 'sans_wildcard')
+            {
+                continue;
+            }
+            $keep = $name === 'sans_wildcard' ? $chargeable['wildcard'] : $chargeable['single'];
+            if((int)$option->qty > $keep)
+            {
+                Capsule::table('tblhostingconfigoptions')->where('relid', (int)$serviceId)->where('configid', (int)$option->configid)->update(['qty' => $keep]);
+                $trimmed[] = ((int)$option->qty - $keep) . ' ' . ($name === 'sans_wildcard' ? 'wildcard' : 'single');
+            }
+        }
+        if($trimmed)
+        {
+            CertificateService::event($serviceId, 'info', '[Subscription] Unused domain slots are not renewed: ' . implode(', ', $trimmed) . ' removed from the service');
+        }
     }
 
     /** credit description of the next-year part of domain purchases of a renewal that was not paid */
