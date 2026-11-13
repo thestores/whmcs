@@ -1,0 +1,18 @@
+<div :id="cid_" class="">
+    <div class="lu-app-header lu-app-header--responsive lu-navbar tss-head">
+        <a :href="mainUrl_" class="tss-head__brand" v-if="moduleName_">
+            <span class="tss-head__logo"><svg class="tss-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10,17L6,13L7.41,11.58L10,14.17L16.59,7.58L18,9M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1Z"/></svg></span>
+            <span class="tss-head__text"><strong>{{moduleName_}}</strong><small>SSL certificate management</small></span>
+        </a>
+        <button class="lu-navbar__burger lu-navbar-right lu-btn" data-target=".lu-app-navbar" data-toggle="offCanvas">
+            <span class="lu-btn__icon lu-burger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </span>
+        </button>
+    </div>
+    <div class="lu-app-navbar lu-navbar lu-navbar--responsive lu-off-canvas-responsive lu-off-canvas-responsive--right" v-if="navbar_.slots && (navbar_.slots.elements || moduleName_)">
+        <component v-if="navbar_.slots && navbar_.slots.elements" v-bind="navbar_.slots" v-bind:is="navbar_.name" v-if="navbar_"></component>
+    </div>
+</div>

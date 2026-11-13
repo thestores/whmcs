@@ -1,0 +1,21 @@
+<?php
+
+namespace ModulesGarden\tssmodule\Core\Http;
+
+use ModulesGarden\tssmodule\Core\Helper\BuildUrl;
+
+/**
+ * Description of Request
+ */
+class Request extends \Symfony\Component\HttpFoundation\Request
+{
+    public function __construct()
+    {
+        parent::__construct($_GET, $_POST, [], $_COOKIE, $_FILES, $_SERVER);
+    }
+
+    public function getScheme(): string
+    {
+        return BuildUrl::getVisitorScheme() ?? parent::getScheme();
+    }
+}

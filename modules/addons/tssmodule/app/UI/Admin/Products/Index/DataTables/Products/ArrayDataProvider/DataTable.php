@@ -1,0 +1,197 @@
+<?php
+
+namespace ModulesGarden\tssmodule\App\UI\Admin\Products\Index\DataTables\Products\ArrayDataProvider;
+
+
+use ModulesGarden\tssmodule\App\Libs\Helpers;
+use ModulesGarden\tssmodule\App\Libs\ProductCatalog;
+
+use ModulesGarden\tssmodule\App\Models\RemoteProduct;
+use ModulesGarden\tssmodule\App\UI\Admin\Products\Index\DataTables\Products\Modals\ImportModal;
+use ModulesGarden\tssmodule\App\UI\Admin\Products\Index\DataTables\Products\Modals\ConfigurationModal;
+use ModulesGarden\tssmodule\App\UI\Admin\Products\Index\DataTables\Products\Modals\ReSyncModal;
+use ModulesGarden\tssmodule\Components\Button\Button;
+use ModulesGarden\tssmodule\Components\Button\ButtonPrimary;
+use ModulesGarden\tssmodule\Components\Button\ButtonSuccess;
+use ModulesGarden\tssmodule\Components\DataTable\Column;
+use ModulesGarden\tssmodule\Components\IconButton\IconButton;
+use ModulesGarden\tssmodule\Components\IconButton\IconButtonEdit;
+use ModulesGarden\tssmodule\Components\Label\LabelSuccess;
+use ModulesGarden\tssmodule\Components\VisibilityWrapper\VisibilityWrapper;
+use ModulesGarden\tssmodule\Core\Components\Actions\ModalLoad;
+use ModulesGarden\tssmodule\Core\Contracts\Components\AdminAreaInterface;
+use ModulesGarden\tssmodule\Core\Contracts\Components\AjaxComponentInterface;
+use ModulesGarden\tssmodule\Core\DataProviders\ArrayDataProvider;
+use ModulesGarden\tssmodule\Core\WHMCS\Models\Product;
+use WHMCS\User\Client;
+
+class DataTable extends \ModulesGarden\tssmodule\Components\DataTable\DataTable implements AdminAreaInterface, AjaxComponentInterface
+{
+    public function loadHtml(): void
+    {
+        $this->setId('productsDataTable');
+
+        $this->addColumn((new Column('id'))
+                             ->setTitle($this->translate('id'))
+                             ->setSortable()
+                             ->setSearchable(true, Column::TYPE_INT))
+             ->addColumn((new Column('productName'))
+                             ->setTitle($this->translate('productName'))
+                             ->setSortable(true)
+                             ->setSearchable(true))
+             ->addColumn((new Column('brand'))
+                             ->setTitle($this->translate('brand'))
+                             ->setSortable(true)
+                             ->setSearchable(true))
+             ->addColumn((new Column('validation'))
+                             ->setTitle($this->translate('validation'))
+                             ->setSortable(true)
+                             ->setSearchable(true))
+             ->addColumn((new Column('provider'))
+                             ->setTitle($this->translate('provider'))
+                             ->setSortable(true)
+                             ->setSearchable(true))
+             ->addColumn((new Column('billing'))
+                             ->setTitle($this->translate('billing'))
+                             ->setSortable(true)
+                             ->setSearchable(true))
+             ->addColumn((new Column('status'))
+                             ->setTitle($this->translate('status'))
+                             ->setSortable(true)
+                             ->setSearchable(true));
+
+        if(($_REQUEST['mg-page'] ?? '') != 'configuration')
+        {
+            $this->addColumn((new Column('manage'))->setTitle($this->translate('manage')));
+        }
+
+        $this->setRecordsPerPageOptions([10, 25]);
+
+        $visibilityWrapper = new VisibilityWrapper((new IconButtonEdit())->onClick(new ModalLoad(new ConfigurationModal())));
+        $visibilityWrapper->hideWhen('hidePricing', true);
+        $this->addActionButton($visibilityWrapper);
+
+        /*
+                $visibilityWrapper = new VisibilityWrapper((new IconButton())->setTitle($this->translate('import'))->setIcon('import')->onClick(new ModalLoad(new ImportModal())));
+                $visibilityWrapper->hideWhen('hideImport', true);
+                $this->addActionButton($visibilityWrapper);
+        */
+
+        $this->addMassActionButton(
+            (new ButtonSuccess())->setTitle($this->translate('import'))->setIcon('import')->onClick(new ModalLoad(new ImportModal()))
+        );
+
+        if($_REQUEST['mg-page'] != 'configuration')
+        {
+            $reSyncButton = new ButtonPrimary();
+            $reSyncButton->setTitle($this->translate('reSync'));
+            $reSyncButton->onClick(new ModalLoad(new ReSyncModal()));
+            $this->addToToolbar($reSyncButton);
+        }
+
+    }
+
+    public function loadData(): void
+    {
+        $rows = [];
+
+        if(!RemoteProduct::isSynchronized())
+        {
+            RemoteProduct::synchronize();
+        }
+
+        $brandWeights = [
+            'Digicert' => 1,
+            'RapidSSL' => 2,
+            'GeoTrust' => 3,
+            'Sectigo'  => 99,
+        ];
+
+        // only the edition's own vendor (a catalogue copied from the other edition is not offered)
+        $vendors        = array_map('strtoupper', \ModulesGarden\tssmodule\App\Libs\Edition::vendors());
+        $remoteProducts = RemoteProduct::whereIn('vendor', $vendors)->get()->sortBy(function($product) use ($brandWeights) {
+            return ($brandWeights[$product->brand] ?? 50) . $product->name;
+        });
+
+        foreach($remoteProducts as $remoteProduct)
+        {
+            $whmcsProduct = $remoteProduct->getWhmcsProduct();
+
+            // products the module can not sell yet are not offered for import (one imported earlier stays listed)
+            if(!$whmcsProduct && !\ModulesGarden\tssmodule\App\Libs\ProductCatalog::importable($remoteProduct))
+            {
+                continue;
+            }
+
+            $rows[] = [
+                'id'             => $remoteProduct->id,
+                'whmcsProductId' => $whmcsProduct ? $whmcsProduct->id : null,
+                'productName'    => htmlspecialchars((string)$remoteProduct->name, ENT_QUOTES, 'UTF-8', false),
+                'brand'          => htmlspecialchars((string)$remoteProduct->brand, ENT_QUOTES, 'UTF-8', false),
+                'validation'     => htmlspecialchars((string)$remoteProduct->validation, ENT_QUOTES, 'UTF-8', false),
+                'provider'       => Helpers::vendorToDisplay($remoteProduct->vendor),
+                'billing'        => $whmcsProduct ? $this->translate('billing_' . ($whmcsProduct->paytype ?: 'recurring')) : '-',
+                'status'         => $this->badges(ProductCatalog::badges((array)$remoteProduct->rawData, $whmcsProduct)),
+                'manage'         => $whmcsProduct ? $this->manageLinks($whmcsProduct, (bool)ProductCatalog::optionProblems((int)$whmcsProduct->id, (array)$remoteProduct->rawData)) : '',
+                'hidePricing'    => !$whmcsProduct,
+                'hideImport'     => (bool)$whmcsProduct,
+            ];
+        }
+
+        $dataProv = new ArrayDataProvider($rows);
+        //$dataProv->setDefaultSorting('id', 'ASC');
+        $this->setDataProvider($dataProv);
+    }
+
+
+    protected function parseDataSetRecords(): void
+    {
+        $this->dataSet->modifyRecords();
+    }
+
+    const BADGE_CLASSES = [
+        'imported' => 'lu-label--success', 'not_imported' => 'lu-label--default', 'hidden' => 'lu-label--warning',
+        'retired'  => 'lu-label--danger', 'removed' => 'lu-label--danger', 'options' => 'lu-label--warning',
+    ];
+
+    protected function badges(array $badges)
+    {
+        $html = '';
+        foreach($badges as $badge)
+        {
+            $html .= '<span class="lu-label lu-label--sm ' . (self::BADGE_CLASSES[$badge] ?? 'lu-label--default') . '" style="margin:0 3px 3px 0">'
+                . htmlspecialchars($this->translate('badge_' . $badge)) . '</span>';
+        }
+
+        return $html;
+    }
+
+    /**
+     * Hide / show, retire / un-retire, fix configurable options, cancel all renewals (App\Http\Admin\Products)
+     */
+    protected function manageLinks($whmcsProduct, $optionsNeedFix = false)
+    {
+        $base    = 'addonmodules.php?module=tssmodule&mg-page=products&pid=' . (int)$whmcsProduct->id . '&token=' . urlencode(function_exists('generate_token') ? \generate_token('plain') : '') . '&mg-action=';
+        $actions = [];
+        if(!$whmcsProduct->retired)
+        {
+            $actions[$whmcsProduct->hidden ? 'show' : 'hide'] = '';
+        }
+        $actions[$whmcsProduct->retired ? 'unretire' : 'retire'] = $whmcsProduct->retired ? '' : 'confirm_retire';
+        if($optionsNeedFix)
+        {
+            // the "Check options" badge: only then is there something to fix
+            $actions['fixOptions'] = '';
+        }
+        $actions['cancelRenewals'] = 'confirm_cancel_renewals';
+
+        $links = [];
+        foreach($actions as $action => $confirm)
+        {
+            $links[] = '<a href="' . htmlspecialchars($base . $action) . '"' . ($confirm ? ' onclick="return confirm(' . htmlspecialchars(json_encode($this->translate($confirm))) . ')"' : '') . '>'
+                . htmlspecialchars($this->translate('action_' . $action)) . '</a>';
+        }
+
+        return '<span style="white-space:nowrap;font-size:12px">' . implode(' · ', $links) . '</span>';
+    }
+}

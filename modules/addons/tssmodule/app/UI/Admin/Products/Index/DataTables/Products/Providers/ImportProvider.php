@@ -1,0 +1,318 @@
+<?php
+
+namespace ModulesGarden\tssmodule\App\UI\Admin\Products\Index\DataTables\Products\Providers;
+
+use ModulesGarden\tssmodule\App\Libs\AcmeHelpers;
+use ModulesGarden\tssmodule\App\Libs\FinancePolicy;
+use ModulesGarden\tssmodule\App\Libs\Helpers;
+use ModulesGarden\tssmodule\App\Models\RemoteProduct;
+use ModulesGarden\tssmodule\App\Repositories\Whmcs\ProductRepository;
+use ModulesGarden\tssmodule\Core\DataProviders\CrudProvider;
+use ModulesGarden\tssmodule\Core\Support\Facades\Request;
+use ModulesGarden\tssmodule\Core\WHMCS\Models\Currency;
+use ModulesGarden\tssmodule\Core\WHMCS\Models\Pricing;
+use ModulesGarden\tssmodule\Core\WHMCS\Models\Product;
+use ModulesGarden\tssmodule\Core\WHMCS\Models\ProductGroup;
+use ModulesGarden\tssmodule\Packages\Product\Libs\ConfigurableOptions\Quantity;
+use ModulesGarden\tssmodule\Packages\Product\Libs\ConfigurableOptions\SubOption\SubOption;
+use ModulesGarden\tssmodule\Packages\Product\Services\ConfigurableOptions;
+
+class ImportProvider extends CrudProvider
+{
+    public function read()
+    {
+        $this->data = $this->formData;
+
+        $this->availableValues['productGroup'] = Helpers::getProductGroupOptions();
+        $this->availableValues['currency']     = Helpers::getCurrencyOptions();
+
+        $ajaxData = Request::get('ajaxData');
+        $formData = $this->formData;
+        $mode     = 'individual';
+
+        if(isset($ajaxData['reloadedBy']) && $ajaxData['reloadedBy'] == 'pricingTypePercent')
+        {
+            $mode = ((bool)$formData['pricingTypePercent']) ? "percent" : "individual";
+        }
+        elseif(isset($ajaxData['reloadedBy']) && $ajaxData['reloadedBy'] == 'pricingTypeIndividual')
+        {
+            $mode = ((bool)$formData['pricingTypeIndividual']) ? "individual" : "percent";
+        }
+        elseif(isset($ajaxData['reloadedBy']) && $ajaxData['reloadedBy'] == 'productGroup')
+        {
+            $mode = ((bool)$formData['pricingTypeIndividual']) ? "individual" : "percent";
+        }
+
+        $this->data['pricingTypeIndividual'] = ($mode == 'individual');
+        $this->data['pricingTypePercent']    = ($mode == 'percent');
+    }
+
+    public function create()
+    {
+        if($this->formData['productGroup'] == 'new')
+        {
+            $productGroupName = trim($this->formData['productGroupName']);
+            $slug             = strtolower($productGroupName);
+            $slug             = str_replace(' ', '-', $slug);
+            $slugIndex        = '';
+            $index            = 1;
+
+            while(true)
+            {
+                $existingGroup = ProductGroup::where('slug', $slug . $slugIndex)->first();
+
+                if($existingGroup)
+                {
+                    $slugIndex = $index;
+                    $index++;
+                }
+                else
+                {
+                    $slug = $slug . $slugIndex;
+                    break;
+                }
+            }
+
+            $productGroupModel         = new ProductGroup();
+            $productGroupModel->name   = $productGroupName;
+            $productGroupModel->slug   = $slug;
+            $productGroupModel->hidden = 0;
+            $productGroupModel->save();
+
+            $productGroupId = $productGroupModel->id;
+        }
+        else
+        {
+            $productGroupId = (int)$this->formData['productGroup'];
+        }
+
+        $localIds           = explode(',', $this->formData['id']);
+        $baseCurrencyRate   = $this->formData['rate'] ?: 1;
+        $pricingTypePercent = (bool)$this->formData['pricingTypePercent'];
+        $importMargin       = max(0, floatval($this->formData['profitMargin'] ?? 0)); // the margin entered in the import form
+
+        //$baseCurrencyId - USD or default WHMCS currency
+        $baseCurrencyId = Helpers::getCurrencyIdByCode('USD');
+
+        if(!$baseCurrencyId)
+        {
+            $baseCurrencyId = Helpers::getDefaultCurrencyId();
+        }
+
+        if(!$baseCurrencyId)
+        {
+            throw new \Exception("invalidCurrency");
+        }
+
+        foreach($localIds as $localId)
+        {
+            $remoteProduct = RemoteProduct::find($localId);
+
+            // an imported product is never created a second time (ticked again, or the form sent twice)
+            if(!$remoteProduct || !\ModulesGarden\tssmodule\App\Libs\ProductCatalog::importable($remoteProduct) || $remoteProduct->getWhmcsProduct())
+            {
+                continue;
+            }
+
+            $productName        = $remoteProduct->name;
+            $productDescription = $remoteProduct->description;
+            $remoteProductData  = $remoteProduct->rawData;
+            $pricing            = [];
+
+            foreach($remoteProductData['prices'] as $remotePriceData)
+            {
+                $billingPeriod = Helpers::monthsToBillingPeriod($remotePriceData['term']);
+
+                if($billingPeriod === false)
+                {
+                    continue;
+                }
+
+                if(isset($remotePriceData['base']['single']['selling']))
+                {
+                    $apiPrice = floatval($remotePriceData['base']['single']['selling']);
+                }
+                elseif(isset($remotePriceData['base']['wildcard']['selling']))
+                {
+                    $apiPrice = floatval($remotePriceData['base']['wildcard']['selling']);
+                }
+                elseif(isset($remotePriceData['selling']))
+                {
+                    $apiPrice = floatval($remotePriceData['selling']);
+                }
+                else
+                {
+                    continue;
+                }
+
+                $baseCost   = $apiPrice * $baseCurrencyRate;
+                $currencies        = Currency::get();
+
+                foreach($currencies as $currency)
+                {
+                    $pricing[$currency->id][$billingPeriod] = FinancePolicy::sell($baseCost, $importMargin, (int)$remotePriceData['term'], $currency->id, true);
+
+                    if(\ModulesGarden\tssmodule\App\Libs\SubscriptionBilling::isSubscriptionRemote($remoteProduct) && $billingPeriod == 'annually')
+                    {
+                        $pricing[$currency->id]['monthly'] = FinancePolicy::sell($baseCost, $importMargin, (int)$remotePriceData['term'], $currency->id, true);
+                    }
+                }
+            }
+
+            $productRepository = new ProductRepository();
+            $productId         = $productRepository->createProduct($productName, $productDescription, $productGroupId, $pricing);
+
+            if($productId)
+            {
+                $dcvArray            = $remoteProductData['dcv'] ?? [];
+                $includedSan         = (int)($remoteProductData['san']['included']['single'] ?? 0);
+                $includedSanWildcard = (int)($remoteProductData['san']['included']['wildcard'] ?? 0);
+
+                $productRepository->updateProductConfiguration($productId, [
+                    'provider'              => $remoteProduct->vendor,
+                    'product_id'            => $remoteProduct->remoteId,
+                    'brand'                 => $remoteProduct->brand,
+                    'validation'            => $remoteProduct->validation,
+                    'category'              => $remoteProduct->category,
+                    'dcv'                   => implode(',', $dcvArray),
+                    //'price_auto'            => $pricingTypePercent ? 'on' : 'off',
+                    'price_auto'            => 'on', //always on
+                    'included_san'          => $includedSan,
+                    'included_san_wildcard' => $includedSanWildcard,
+                ]);
+            }
+            else
+            {
+                throw new \Exception('productCreationFailed');
+            }
+
+            // code signing: the "Certificate Delivery" option (token shipping as a one-time fee)
+            if(strtolower((string)$remoteProduct->category) === \ModulesGarden\tssmodule\App\Libs\CodeSigningService::CATEGORY)
+            {
+                \ModulesGarden\tssmodule\App\Libs\CodeSigningService::createDeliveryOption($productId, (array)$remoteProductData);
+            }
+
+            //create configOptions
+
+            $product = Product::find($productId);
+
+            // subscriptions: one-time products, the module bills the yearly renewal (SubscriptionRenewals)
+            if(\ModulesGarden\tssmodule\App\Libs\SubscriptionBilling::isSubscriptionProduct($productId))
+            {
+                $product->paytype = 'onetime';
+                $product->configoptionsupgrade = AcmeHelpers::isAcmeWhmcsProduct($productId) ? 1 : $product->configoptionsupgrade;
+                $product->save();
+            }
+
+            if(!$product)
+            {
+                continue;
+            }
+
+            $optionNames = [];
+
+            // the client sees these names on the order form: say what is already in the price
+            if(!empty($remoteProductData['san']['single_allowed']))
+            {
+                $optionNames['single'] = [
+                    'name'         => 'sans',
+                    'nameFriendly' => \ModulesGarden\tssmodule\App\Libs\ProductCatalog::optionLabel('single', $includedSan),
+                    'unit'         => 'SAN'
+                ];
+            }
+
+            if(!empty($remoteProductData['san']['wildcard_allowed']))
+            {
+                $optionNames['wildcard'] = [
+                    'name'         => 'sans_wildcard',
+                    'nameFriendly' => \ModulesGarden\tssmodule\App\Libs\ProductCatalog::optionLabel('wildcard', $includedSanWildcard),
+                    'unit'         => 'SAN'
+                ];
+            }
+
+            // SAN options: let clients buy more SANs later (WHMCS "Configurable Options Upgrades")
+            if($optionNames && !(int)$product->configoptionsupgrade)
+            {
+                $product->configoptionsupgrade = 1;
+                $product->save();
+            }
+
+            foreach($optionNames as $remoteOptionName => $localOptionNames)
+            {
+                $localOptionName         = $localOptionNames['name'];
+                $localOptionNameFriendly = $localOptionNames['nameFriendly'];
+                $localOptionUnitName     = $localOptionNames['unit'];
+                $min                     = $remoteProductData['san']['min'] ?: 0;
+                $max                     = $remoteProductData['san']['max'] ?: 0;
+                $included                = 0;
+
+                if($remoteOptionName == 'single')
+                {
+                    $included = $includedSan;
+                }
+                elseif($remoteOptionName == 'wildcard')
+                {
+                    $included = $includedSanWildcard;
+                }
+
+                $max = $max - ($included - $min);
+                $min = 0;
+
+                if($max < 0)
+                {
+                    $max = 0;
+                }
+
+                $configurableOption = (new Quantity($localOptionName, $localOptionNameFriendly))->setRange($min, $max);
+                $subOption          = (new SubOption($localOptionUnitName));
+
+                $configurableOption->addOption($subOption);
+                $configurableOptionsService = new ConfigurableOptions($product);
+                $configurableOptionModel    = $configurableOptionsService->createConfigurableOption($configurableOption);
+                $subOptions                 = $configurableOptionModel->suboptions()->get();
+
+                foreach($subOptions as $subOption)
+                {
+                    $pricingArray = [];
+
+                    foreach($remoteProductData['prices'] as $remotePriceData)
+                    {
+                        $billingPeriod = Helpers::monthsToBillingPeriod($remotePriceData['term']);
+
+                        if($billingPeriod === false)
+                        {
+                            continue;
+                        }
+
+                        if(isset($remotePriceData['san'][$remoteOptionName]['selling']))
+                        {
+                            $apiPrice = floatval($remotePriceData['san'][$remoteOptionName]['selling']);
+                        }
+                        else
+                        {
+                            continue;
+                        }
+
+                        $baseCost          = $apiPrice * $baseCurrencyRate;
+                        $currencies        = Currency::get();
+
+                        foreach($currencies as $currency)
+                        {
+                            $pricingArray[$currency->id][$billingPeriod] = FinancePolicy::sell($baseCost, $importMargin, (int)$remotePriceData['term'], $currency->id, false);
+
+                            if(\ModulesGarden\tssmodule\App\Libs\SubscriptionBilling::isSubscriptionRemote($remoteProduct) && $billingPeriod == 'annually')
+                            {
+                                $pricingArray[$currency->id]['monthly'] = FinancePolicy::sell($baseCost, $importMargin, (int)$remotePriceData['term'], $currency->id, false);
+                            }
+                        }
+                    }
+
+                    foreach($pricingArray as $currencyId => $pricingData)
+                    {
+                        Pricing::where('type', 'configoptions')->where('currency', $currencyId)->where('relid', $subOption->id)->update($pricingData);
+                    }
+                }
+            }
+        }
+    }
+}
