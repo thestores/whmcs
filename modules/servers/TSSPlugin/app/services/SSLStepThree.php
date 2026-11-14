@@ -9,7 +9,6 @@ use ModulesGarden\TSSPlugin\App\Libs\Helpers;
 use ModulesGarden\TSSPlugin\App\Libs\ProductSettings;
 use ModulesGarden\TSSPlugin\App\Libs\SanUpgrade;
 use ModulesGarden\TSSPlugin\App\Libs\SSLTrustCenterApi;
-use ModulesGarden\TSSPlugin\App\Models\DemonTask;
 use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
 use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\ProductRepository;
 use ModulesGarden\TSSPlugin\App\Models\Request;
@@ -177,16 +176,8 @@ class SSLStepThree
                 ]
             );
 
-            if($newOrder['order']['status'] == 'processing')
-            {
-                DemonTask::insert([
-                    'session_id' => session_id(),
-                    'service_id' => $params['serviceid'],
-                    'status' => 'waiting',
-                    'created_at' => date('Y-m-d H:i:s'),
-                    'updated_at' => date('Y-m-d H:i:s')
-                ]);
-            }
+            // (a "processing" order is picked up by the SSLCertificatesProcessing cron; the client's session id is
+            // no longer stored for a task runner that never ran)
 
             // SANs paid with this order - an upgrade of the SAN options orders only the difference (see SanUpgrade)
             SanUpgrade::rememberPurchased($params['serviceid'], SanUpgrade::paidQuantities($params));
