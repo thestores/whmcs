@@ -90,7 +90,7 @@ $_LANG['admin.migration.support_full'] = 'Migration wird unterstützt.';
 $_LANG['admin.migration.support_partial'] = 'Migration wird mit Einschränkungen unterstützt.';
 $_LANG['admin.migration.support_unsupported'] = 'Diese Altversion kann nicht migriert werden.';
 $_LANG['admin.migration.files_missing'] = 'Die Dateien des Altmoduls befinden sich nicht mehr auf dem Server (nur noch Daten): Ein Rollback stellt die Daten wieder her, aber kein funktionierendes Altmodul.';
-$_LANG['admin.migration.unsupported_found'] = 'Von diesem Modul nicht unterstützt und im Altmodul belassen:';
+$_LANG['admin.migration.unsupported_found'] = 'Von diesem Modul nicht unterstützte Produkttypen (ihre Zertifikate werden als Aufzeichnung behalten):';
 $_LANG['admin.migration.other_modules'] = 'Weitere vorhandene SSL-Module (unverändert):';
 $_LANG['admin.migration.choice_current'] = 'Entscheidung aus dem Einrichtungsassistenten:';
 $_LANG['admin.migration.choice_migrate'] = 'migrieren';
@@ -110,7 +110,7 @@ $_LANG['admin.migration.unsupported_version_hint'] = 'Aktualisieren Sie das Altm
 $_LANG['admin.migration.run_title'] = 'Migration #:id (:source)';
 $_LANG['admin.migration.run_stale'] = 'Seit mehr als 10 Minuten kein Fortschritt. Der Lauf wird fortgesetzt, solange diese Seite geöffnet bleibt; oder setzen Sie ihn zurück.';
 $_LANG['admin.migration.verify_result'] = 'Überprüfung: :checked migrierte Services geprüft, :active aktive SSL-Services mit vollständigen Daten, :left verbleibende Bestellzeilen des Altmoduls.';
-$_LANG['admin.migration.exceptions'] = ':n Ausnahmen (im Altmodul belassen)';
+$_LANG['admin.migration.exceptions'] = ':n nicht migrierte Dienste oder Produkte (mit Grund)';
 $_LANG['admin.migration.col_object'] = 'Objekt';
 $_LANG['admin.migration.col_status'] = 'Status';
 $_LANG['admin.migration.col_reason'] = 'Grund';
@@ -1513,3 +1513,31 @@ $_LANG['admin.settings.index.providers.finance_settings_provider.pendingWait_14'
 $_LANG['admin.settings.index.providers.ssl_settings_provider.pendingWait_14'] = '14 Tage auf den Eingang warten';
 $_LANG['admin.settings.index.providers.finance_settings_provider.pendingWait_30'] = '30 Tage auf den Eingang warten';
 $_LANG['admin.settings.index.providers.ssl_settings_provider.pendingWait_30'] = '30 Tage auf den Eingang warten';
+
+// migration: products without a gateway match, automatic rollback (1.7.0)
+$_LANG['admin.migration.map_title'] = ':n Altprodukte haben keine Entsprechung beim Zertifikatsanbieter';
+$_LANG['admin.migration.map_intro'] = 'Wählen Sie für jedes vor dem Start: ein Alternativprodukt (bestehende Zertifikate funktionieren weiter und werden als das neue Produkt verlängert) oder die Zertifikate nur als Aufzeichnung behalten. Das Altmodul bleibt für sie nicht erhalten.';
+$_LANG['admin.migration.map_col_legacy'] = 'Altprodukt';
+$_LANG['admin.migration.map_col_services'] = 'Dienste';
+$_LANG['admin.migration.map_col_choice'] = 'Migrieren als';
+$_LANG['admin.migration.map_services'] = ':active aktiv, :awaiting warten auf Konfiguration, :other sonstige';
+$_LANG['admin.migration.map_choose'] = '- wählen -';
+$_LANG['admin.migration.map_record'] = 'Nur als Aufzeichnung behalten (keine Verlängerung)';
+$_LANG['admin.migration.map_same_brand'] = 'Gleiche Marke';
+$_LANG['admin.migration.map_all_products'] = 'Alle Produkte';
+$_LANG['admin.migration.map_unsupported'] = 'Dieser Produkttyp wird vom Modul nicht unterstützt: seine Zertifikate können nur als Aufzeichnung behalten werden.';
+$_LANG['admin.migration.map_record_hint'] = 'Nur Aufzeichnung: das Zertifikat und seine Bestelldaten bleiben für den Kunden und Sie sichtbar, es kann aber nicht verlängert, neu ausgestellt oder konfiguriert werden, wird nie für eine Verlängerung in Rechnung gestellt, und das Produkt kann nicht erneut bestellt werden. Zertifikate, die auf Konfiguration warten, können dann nie konfiguriert werden - ordnen Sie diese Produkte nach Möglichkeit einer Alternative zu.';
+$_LANG['admin.migration.auto_rollback'] = 'Diese Migration wurde angehalten und automatisch zurückgesetzt: :reason. Das Altmodul arbeitet wie zuvor. Laden Sie den Fehlerbericht herunter und senden Sie ihn an den Support.';
+$_LANG['admin.migration.btn_error_report'] = 'Fehlerbericht herunterladen';
+$_LANG['admin.migration.map_quiet'] = ':n weitere Altprodukte ohne Entsprechung haben keine aktiven oder unkonfigurierten Zertifikate: sie werden als eingestellte Aufzeichnungen behalten (keine Auswahl nötig)';
+
+// setup wizard: migration step (1.7.0)
+$_LANG['instalation.wizard.step7_name'] = 'Migration';
+$_LANG['instalation.wizard.step7_desc'] = 'Altmodul übernehmen';
+$_LANG['admin.configuration.content.step7.step7_title'] = 'Migration';
+$_LANG['admin.migration.wizard_done'] = 'Die Migration ist abgeschlossen: die Zertifikate des Altmoduls werden jetzt hier verwaltet, und das Altmodul ist abgeschaltet.';
+$_LANG['admin.migration.wizard_continue'] = 'Weiter';
+$_LANG['admin.migration.wizard_later_hint'] = 'Sie können die Migration auch später unter Addons > Migration ausführen; bis dahin arbeitet das Altmodul weiter.';
+$_LANG['admin.migration.wizard_later'] = 'Später migrieren';
+$_LANG['admin.configuration.content.step6.migration_pending'] = 'Die Migration des Altmoduls wurde noch nicht ausgeführt: beide Module sind aktiv, bis Sie sie unter <b>Addons > Migration</b> ausführen.';
+$_LANG['admin.migration.nothing_left'] = 'Nichts mehr zu migrieren: die Produkte und Zertifikate dieses Altmoduls wurden durch die Migration unten übernommen.';

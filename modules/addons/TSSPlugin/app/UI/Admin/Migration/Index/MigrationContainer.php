@@ -23,6 +23,16 @@ class MigrationContainer extends Container implements AdminAreaInterface
 {
     use TranslatorTrait;
 
+    /** @var bool shown as the wizard's migration step: this edition's legacy module, its latest run, the way on */
+    protected $wizardMode = false;
+
+    public function setWizardMode(bool $wizard): self
+    {
+        $this->wizardMode = $wizard;
+
+        return $this;
+    }
+
     public function loadHtml(): void
     {
         $this->setCss('tss-migration');
@@ -31,6 +41,13 @@ class MigrationContainer extends Container implements AdminAreaInterface
         {
             $this->addElement($this->html('<div class="tss-note is-bad">' . htmlspecialchars($_SESSION['tss_migration_error']) . '</div>'));
             unset($_SESSION['tss_migration_error']);
+        }
+
+        if($this->wizardMode)
+        {
+            $this->loadWizard();
+
+            return;
         }
 
         $active = Store::activeRun();
@@ -66,6 +83,46 @@ class MigrationContainer extends Container implements AdminAreaInterface
             }
             $this->addElement($this->runWidget($run, false));
         }
+    }
+
+    /**
+     * Wizard step: the run in progress, or a completed run and the way on, or the legacy module to start with
+     * (after a run that was rolled back too, with its report). "Later" goes on without migrating.
+     */
+    protected function loadWizard(): void
+    {
+        $source = \ModulesGarden\TSSPlugin\App\Libs\Edition::get();
+        $active = Store::activeRun();
+        if($active)
+        {
+            $this->addElement($this->runWidget($active, true));
+
+            return;
+        }
+
+        Store::createTables();
+        $row    = \WHMCS\Database\Capsule::table(Store::runsTable())->where('source', $source)->where('status', '<>', Store::RUN_DRY_RUN)->orderBy('id', 'desc')->first();
+        $latest = $row ? Store::getRun((int)$row->id) : null;
+        $next   = \ModulesGarden\TSSPlugin\App\UI\Admin\Configuration\Shared\WizardLayout::pageUrl(6);
+        if($latest && $latest['status'] === Store::RUN_COMPLETED)
+        {
+            $this->addElement($this->runWidget($latest, false));
+            $this->addElement($this->html('<div class="tss-note is-ok">' . htmlspecialchars($this->t('wizard_done')) . '</div>'
+                . '<div class="tss-actions"><a class="lu-btn lu-btn--success" href="' . htmlspecialchars($next) . '">' . htmlspecialchars($this->t('wizard_continue')) . '</a></div>'));
+
+            return;
+        }
+        if($latest)
+        {
+            $this->addElement($this->runWidget($latest, false));
+        }
+        $found = Detector::detect();
+        if(isset($found[$source]))
+        {
+            $this->addElement($this->sourceWidget($source, $found[$source]));
+        }
+        $this->addElement($this->html('<p class="tss-muted">' . htmlspecialchars($this->t('wizard_later_hint')) . ' '
+            . '<a href="' . htmlspecialchars($next) . '">' . htmlspecialchars($this->t('wizard_later')) . '</a></p>'));
     }
 
     // ---- one legacy module ---- //
@@ -109,19 +166,42 @@ class MigrationContainer extends Container implements AdminAreaInterface
         $html .= '<p class="tss-muted">' . htmlspecialchars($this->t('credentials_' . Credentials::state($source))) . '</p>';
         $html .= '<p class="tss-muted">' . htmlspecialchars($this->t('choice_current')) . ' <b>' . htmlspecialchars($choice ? $this->t('choice_' . $choice) : $this->t('choice_none')) . '</b></p>';
 
-        if($info['support']['supported'])
+        if((int)$c['products']['total'] === 0 && array_sum(array_map('intval', (array)$c['services'])) === 0)
+        {
+            // everything was moved by an earlier run
+            $html .= '<div class="tss-note is-ok">' . htmlspecialchars($this->t('nothing_left')) . '</div>';
+        }
+        elseif($info['support']['supported'])
         {
             $token  = MigrationController::token();
             $report = 'addonmodules.php?module=TSSPlugin&mg-page=migration&mg-action=report&source=' . $source;
             $base   = 'addonmodules.php?module=TSSPlugin&mg-page=migration&source=' . $source . '&token=' . rawurlencode($token);
-            $html  .= '<p class="tss-muted">' . htmlspecialchars($this->t('start_defaults')) . '</p>'
+
+            // products without a gateway match: the administrator chooses before the start (the form carries it)
+            $engine    = new Engine($source);
+            $unmatched = $engine->unmatched();
+            $html     .= '<form method="post" action="' . htmlspecialchars($base . '&mg-action=start') . '" onsubmit="return confirm(' . htmlspecialchars(json_encode($this->t('confirm_start')), ENT_QUOTES) . ');">'
+                . '<input type="hidden" name="token" value="' . htmlspecialchars($token) . '">'
+                . ($this->wizardMode ? '<input type="hidden" name="return" value="wizard">' : '');
+            $toChoose = array_values(array_filter($unmatched, [Engine::class, 'needsChoice']));
+            $quiet    = array_values(array_filter($unmatched, function($item) { return !Engine::needsChoice($item); }));
+            if($toChoose)
+            {
+                $html .= $this->mappingTable($toChoose, $engine->alternatives());
+            }
+            if($quiet)
+            {
+                $html .= '<details class="tss-details"><summary>' . htmlspecialchars($this->t('map_quiet', ['n' => count($quiet)])) . '</summary><p class="tss-muted">'
+                    . htmlspecialchars(implode(', ', array_column($quiet, 'label'))) . '</p></details>';
+            }
+            $html .= '<p class="tss-muted">' . htmlspecialchars($this->t('start_defaults')) . '</p>'
                 . '<div class="tss-actions">'
                 . '<a class="lu-btn lu-btn--default" href="' . $report . '">' . htmlspecialchars($this->t('btn_report')) . '</a>'
-                . $this->link($base . '&mg-action=start', $this->t('btn_start'), 'lu-btn lu-btn--success', $this->t('confirm_start'))
-                . $this->link($base . '&mg-action=start&opt_keys=0', $this->t('btn_start_nokeys'), 'lu-btn lu-btn--default', $this->t('confirm_start'))
-                . $this->link($base . '&mg-action=start&opt_deactivate=0', $this->t('btn_start_keeplegacy'), 'lu-btn lu-btn--default', $this->t('confirm_start'))
-                . $this->link($base . '&mg-action=skip', $this->t('btn_skip'), 'lu-btn lu-btn--default')
-                . '</div>';
+                . '<button type="submit" class="lu-btn lu-btn--success" name="variant" value="default">' . htmlspecialchars($this->t('btn_start')) . '</button>'
+                . '<button type="submit" class="lu-btn lu-btn--default" name="variant" value="nokeys">' . htmlspecialchars($this->t('btn_start_nokeys')) . '</button>'
+                . ($this->wizardMode ? '' : '<button type="submit" class="lu-btn lu-btn--default" name="variant" value="keeplegacy">' . htmlspecialchars($this->t('btn_start_keeplegacy')) . '</button>'
+                    . $this->link($base . '&mg-action=skip', $this->t('btn_skip'), 'lu-btn lu-btn--default'))
+                . '</div></form>';
         }
         else
         {
@@ -196,8 +276,16 @@ class MigrationContainer extends Container implements AdminAreaInterface
 
         $token   = MigrationController::token();
         $runBase = 'addonmodules.php?module=TSSPlugin&mg-page=migration&id=' . (int)$run['id'] . '&token=' . rawurlencode($token);
-        $html .= '<div class="tss-actions">'
-            . '<a class="lu-btn lu-btn--default" href="addonmodules.php?module=TSSPlugin&mg-page=migration&mg-action=log&id=' . (int)$run['id'] . '">' . htmlspecialchars($this->t('btn_log')) . '</a>';
+        if(!empty($summary['auto_rollback']))
+        {
+            $html .= '<div class="tss-note is-bad">' . htmlspecialchars($this->t('auto_rollback', ['reason' => (string)$summary['auto_rollback']['reason']])) . '</div>';
+        }
+        $html .= '<div class="tss-actions">';
+        if(!empty($summary['auto_rollback']) || $run['status'] === Store::RUN_FAILED)
+        {
+            $html .= '<a class="lu-btn lu-btn--primary" href="addonmodules.php?module=TSSPlugin&mg-page=migration&mg-action=errorReport&id=' . (int)$run['id'] . '">' . htmlspecialchars($this->t('btn_error_report')) . '</a>';
+        }
+        $html .= '<a class="lu-btn lu-btn--default" href="addonmodules.php?module=TSSPlugin&mg-page=migration&mg-action=log&id=' . (int)$run['id'] . '">' . htmlspecialchars($this->t('btn_log')) . '</a>';
         if($run['backup_prefix'])
         {
             $html .= '<span class="tss-muted">' . htmlspecialchars($this->t('backups_until', ['date' => (string)$run['backup_expires_at']])) . '</span>'
@@ -230,6 +318,49 @@ class MigrationContainer extends Container implements AdminAreaInterface
         }
 
         return $runs;
+    }
+
+    /**
+     * One row per legacy product (or TSS order code) without a gateway match: an alternative gateway product, or keep
+     * the certificates as records. Products of the same brand are listed first.
+     */
+    protected function mappingTable(array $unmatched, array $alternatives): string
+    {
+        $html = '<div class="tss-note is-warn"><b>' . htmlspecialchars($this->t('map_title', ['n' => count($unmatched)])) . '</b><br>' . htmlspecialchars($this->t('map_intro')) . '</div>'
+            . '<table class="tss-table tss-map"><thead><tr><th>' . htmlspecialchars($this->t('map_col_legacy')) . '</th><th>' . htmlspecialchars($this->t('map_col_services')) . '</th><th>' . htmlspecialchars($this->t('map_col_choice')) . '</th></tr></thead><tbody>';
+        foreach($unmatched as $item)
+        {
+            $s       = $item['services'];
+            $counts  = $this->t('map_services', ['active' => (int)$s['active'], 'awaiting' => (int)$s['awaiting'], 'other' => (int)$s['other']]);
+            $brandOf = strtolower((string)preg_replace('/[^a-z].*$/i', '', implode(' ', $item['names']) ?: $item['ref']));
+            $same    = [];
+            $other   = [];
+            foreach($alternatives as $alt)
+            {
+                $option = '<option value="' . htmlspecialchars($alt['id']) . '">' . htmlspecialchars($alt['name'] . ($alt['validation'] ? ' (' . strtoupper($alt['validation']) . ')' : '')) . '</option>';
+                if($brandOf !== '' && stripos($alt['brand'] . ' ' . $alt['name'], $brandOf) !== false)
+                {
+                    $same[] = $option;
+                }
+                else
+                {
+                    $other[] = $option;
+                }
+            }
+            $select = '<select class="form-control" name="map[' . htmlspecialchars($item['ref']) . ']" required>'
+                . '<option value="">' . htmlspecialchars($this->t('map_choose')) . '</option>'
+                . '<option value="record">' . htmlspecialchars($this->t('map_record')) . '</option>';
+            if(!$item['unsupported'])
+            {
+                $select .= ($same ? '<optgroup label="' . htmlspecialchars($this->t('map_same_brand')) . '">' . implode('', $same) . '</optgroup>' : '')
+                    . '<optgroup label="' . htmlspecialchars($this->t('map_all_products')) . '">' . implode('', $other) . '</optgroup>';
+            }
+            $select .= '</select>';
+            $html   .= '<tr><td>' . htmlspecialchars($item['label']) . ($item['unsupported'] ? '<br><span class="tss-muted">' . htmlspecialchars($this->t('map_unsupported')) . '</span>' : '') . '</td>'
+                . '<td>' . htmlspecialchars($counts) . '</td><td>' . $select . '</td></tr>';
+        }
+
+        return $html . '</tbody></table><p class="tss-muted">' . htmlspecialchars($this->t('map_record_hint')) . '</p>';
     }
 
     // ---- small helpers ---- //

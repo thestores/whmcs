@@ -84,7 +84,7 @@ $_LANG['admin.migration.support_full']          = 'Migration supported.';
 $_LANG['admin.migration.support_partial']       = 'Migration supported with limits.';
 $_LANG['admin.migration.support_unsupported']   = 'This legacy version cannot be migrated.';
 $_LANG['admin.migration.files_missing']         = 'The legacy module files are no longer on the server (data only): a rollback restores the data but not a working legacy module.';
-$_LANG['admin.migration.unsupported_found']     = 'Not supported by this module and left on the legacy module:';
+$_LANG['admin.migration.unsupported_found']     = 'Product types this module does not support (their certificates are kept as records):';
 $_LANG['admin.migration.other_modules']         = 'Other SSL modules present (not touched):';
 $_LANG['admin.migration.choice_current']        = 'Decision from the setup wizard:';
 $_LANG['admin.migration.choice_migrate']        = 'migrate';
@@ -104,7 +104,7 @@ $_LANG['admin.migration.unsupported_version_hint'] = 'Update the legacy module t
 $_LANG['admin.migration.run_title']             = 'Migration #:id (:source)';
 $_LANG['admin.migration.run_stale']             = 'No progress for more than 10 minutes. The run continues while this page stays open; or roll it back.';
 $_LANG['admin.migration.verify_result']         = 'Verification: :checked migrated services checked, :active active SSL services with complete data, :left legacy order rows left.';
-$_LANG['admin.migration.exceptions']            = ':n exceptions (left on the legacy module)';
+$_LANG['admin.migration.exceptions']            = ':n services or products not migrated (with the reason)';
 $_LANG['admin.migration.col_object']            = 'Object';
 $_LANG['admin.migration.col_status']            = 'Status';
 $_LANG['admin.migration.col_reason']            = 'Reason';
@@ -1522,3 +1522,31 @@ $_LANG['admin.settings.index.providers.finance_settings_provider.pendingWait_14'
 $_LANG['admin.settings.index.providers.ssl_settings_provider.pendingWait_14'] = 'Wait 14 days for it to clear';
 $_LANG['admin.settings.index.providers.finance_settings_provider.pendingWait_30'] = 'Wait 30 days for it to clear';
 $_LANG['admin.settings.index.providers.ssl_settings_provider.pendingWait_30'] = 'Wait 30 days for it to clear';
+
+// migration: products without a gateway match, automatic rollback (1.7.0)
+$_LANG['admin.migration.map_title'] = ':n legacy products have no equivalent at the certificate provider';
+$_LANG['admin.migration.map_intro'] = 'Choose for each one before starting: an alternative product (existing certificates keep working and are renewed as the new product), or keep its certificates as records. The legacy module is not kept for them.';
+$_LANG['admin.migration.map_col_legacy'] = 'Legacy product';
+$_LANG['admin.migration.map_col_services'] = 'Services';
+$_LANG['admin.migration.map_col_choice'] = 'Migrate as';
+$_LANG['admin.migration.map_services'] = ':active active, :awaiting awaiting configuration, :other other';
+$_LANG['admin.migration.map_choose'] = '- choose -';
+$_LANG['admin.migration.map_record'] = 'Keep as a record only (no renewal)';
+$_LANG['admin.migration.map_same_brand'] = 'Same brand';
+$_LANG['admin.migration.map_all_products'] = 'All products';
+$_LANG['admin.migration.map_unsupported'] = 'This product type is not supported by the module: its certificates can only be kept as records.';
+$_LANG['admin.migration.map_record_hint'] = 'Record only: the certificate and its order details stay visible to the client and to you, but it can not be renewed, reissued or configured, it is never invoiced for a renewal, and the product can not be ordered again. Certificates awaiting configuration can never be configured then - map those products to an alternative where you can.';
+$_LANG['admin.migration.auto_rollback'] = 'This migration stopped and was rolled back automatically: :reason. The legacy module works as before. Download the error report and send it to support.';
+$_LANG['admin.migration.btn_error_report'] = 'Download error report';
+$_LANG['admin.migration.map_quiet'] = ':n more legacy products without an equivalent have no active or unconfigured certificates: they are kept as retired records (nothing to choose)';
+
+// setup wizard: migration step (1.7.0)
+$_LANG['instalation.wizard.step7_name'] = 'Migration';
+$_LANG['instalation.wizard.step7_desc'] = 'Move the legacy module';
+$_LANG['admin.configuration.content.step7.step7_title'] = 'Migration';
+$_LANG['admin.migration.wizard_done'] = 'The migration is complete: the certificates of the legacy module are now managed here, and the legacy module is switched off.';
+$_LANG['admin.migration.wizard_continue'] = 'Continue';
+$_LANG['admin.migration.wizard_later_hint'] = 'You can also run the migration later from Addons > Migration; until then the legacy module keeps working.';
+$_LANG['admin.migration.wizard_later'] = 'Migrate later';
+$_LANG['admin.configuration.content.step6.migration_pending'] = 'The migration of the legacy module has not been run yet: both modules are active until you run it from <b>Addons > Migration</b>.';
+$_LANG['admin.migration.nothing_left'] = 'Nothing left to migrate: the products and certificates of this legacy module were moved by the migration below.';
