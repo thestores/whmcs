@@ -18,6 +18,7 @@
             </div>
         </div>
         <div class="tss-hero__foot">
+            {if $renewalNotice}<p class="tss-renewal-notice"><strong>{$renewalNotice|escape}</strong></p>{/if}
             <p>{$MGLANG->T('awaiting_configuration', 'desc')}</p>
             <div class="tss-actions">
                 <a class="tss-btn tss-btn--primary" href="{$url|escape}">

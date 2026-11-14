@@ -111,7 +111,35 @@ class SSLStepThree
                 $orderParams['contacts']['organization'] = $this->prepareContactOrganization($params);
             }
 
-            $newOrder = $api->addOrder($orderParams, $params['serviceid']);
+            // a paid renewal that waited for these details: placed as the renewal of the previous order, so the
+            // vendor carries its days over (App\Libs\RenewalPolicy)
+            $renewal = \ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::pendingRenewal((int)$params['serviceid']);
+            if($renewal)
+            {
+                $orderParams['renewal'] = $renewal;
+            }
+
+            try
+            {
+                $newOrder = $api->addOrder($orderParams, $params['serviceid']);
+            }
+            catch(\Exception $renewalRefused)
+            {
+                if(!$renewal)
+                {
+                    throw $renewalRefused;
+                }
+                // the vendor renews an order only inside its renewal window: the paid renewal is then ordered as a new
+                // certificate with these details (only the carried-over days are lost); a refusal of the details
+                // themselves comes back from this second attempt and is shown to the client as before
+                unset($orderParams['renewal']);
+                $newOrder = $api->addOrder($orderParams, $params['serviceid']);
+                \ModulesGarden\TSSPlugin\App\Libs\CertificateService::event($params['serviceid'], 'info', '[Renewal] The vendor did not take it as a renewal of the previous order (' . $renewalRefused->getMessage() . '): ordered as a new certificate');
+            }
+            if($renewal)
+            {
+                \ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::renewalPlaced((int)$params['serviceid']);
+            }
             $itemId   = SSLTrustCenterApi::getItemId($newOrder);
             SSL::where('serviceid', $params['serviceid'])->update(['remoteid' => $itemId]);
             Service::where('id', $params['serviceid'])->update(['domain' => $decode['CN']]);

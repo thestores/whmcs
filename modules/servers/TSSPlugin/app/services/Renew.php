@@ -7,6 +7,7 @@ use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\SSL;
 use ModulesGarden\TSSPlugin\App\Libs\AcmeHelpers;
 use ModulesGarden\TSSPlugin\App\Libs\AutoInstallHelpers;
 use ModulesGarden\TSSPlugin\App\Libs\CertificateService;
+use ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy;
 use ModulesGarden\TSSPlugin\App\Libs\SSLTrustCenterApi;
 use ModulesGarden\TSSPlugin\App\Models\Request;
 use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
@@ -58,69 +59,124 @@ class Renew
             return 'success';
         }
 
-        $userId = $params['userid'];
-        $pid = $params['pid'];
-        $billingCycle = $params['model']->billingcycle;
-        $paymentMethod = $params['model']->paymentmethod;
-        $configOptions = $params['configoptions'];
-        $domain = $params['domain'];
+        $addonConfig   = (new AddonModuleRepository())->getModuleConfiguration();
+        $rate          = $addonConfig['financeSettings']['rate'] ?: 1;
+        $configProduct = (new ProductRepository())->getProductConfiguration($params['pid']);
+        $api           = SSLTrustCenterApi::forVendor($configProduct['provider'], $configProduct['category']);
 
-        $addonConfig = (new AddonModuleRepository())->getModuleConfiguration();
-        $rate = $addonConfig['financeSettings']['rate'] ?: 1;
-        $sslSettings = $addonConfig['sslSettings'];
+        // two independent choices (App\Libs\RenewalPolicy): which WHMCS service carries the renewal, and whether it is
+        // ordered with the previous details at once or the client submits them again
+        $serviceId   = (int)$serviceId;
+        $sameService = RenewalPolicy::sameService();
+        $target      = $sameService ? $serviceId : $this->renewalService($params);
+        $amount      = $sameService ? (float)$params['model']->amount : (float)Service::where('id', $target)->value('amount');
 
-        $renewOrderViaExistingOrder = $sslSettings['renewOrderViaExistingOrder'];
-        $automaticProcessingOfRenewalOrders = $sslSettings['automaticProcessingOfRenewalOrders'];
-        $configProduct = (new ProductRepository())->getProductConfiguration($pid);
-
-        $api = SSLTrustCenterApi::forVendor($configProduct['provider'], $configProduct['category']);
-
-        if($renewOrderViaExistingOrder)
+        if(RenewalPolicy::reuseDetails())
         {
-            $this->orderRenewal($api, (int)$serviceId, (int)$serviceId, (float)$params['model']->amount, $rate);
+            try
+            {
+                // the "Certificate Autorenewed" e-mail (or AutoInstall's "Renewal Started") goes out from there
+                $this->orderRenewal($api, $serviceId, $target, $amount, $rate);
+                $this->retire($serviceId, $target);
+
+                return 'success';
+            }
+            catch(\Throwable $e)
+            {
+                // the vendor refused the previous details (a reused key, an organisation to validate again ...):
+                // the renewal is paid, so the client is asked for new details instead of the renewal failing
+                CertificateService::event($serviceId, 'error', '[Renewal] Not accepted with the previous details, the client is asked for new ones: ' . $e->getMessage());
+            }
         }
 
-        if(!$renewOrderViaExistingOrder)
-        {
-            $resultsOrder = localAPI('AddOrder', [
-                'clientid' => $userId,
-                'pid' => [$pid],
-                'qty' => [1],
-                'billingcycle' => [$billingCycle],
-                'configoptions' => [base64_encode(serialize($configOptions))],
-                'paymentmethod' => $paymentMethod,
-                'noinvoice' => true,
-                'noemail' => true
-            ]);
-
-            if($resultsOrder['result'] == 'success')
-            {
-                localAPI('AcceptOrder', [
-                    'orderid' => $resultsOrder['orderid'],
-                    'autosetup' => true,
-                    'sendemail' => $automaticProcessingOfRenewalOrders ? false : true,
-                ]);
-
-                $newServices = explode(',', $resultsOrder['serviceids']);
-                $newServiceId = reset($newServices);
-                if(!$newServiceId) {
-                    return 'The order could not be created. Please check logs.';
-                }
-                Service::where('id', $newServiceId)->update(['domain' => $domain]);
-            }
-            else
-            {
-                return 'The renewal order could not be created: ' . ($resultsOrder['message'] ?? 'unknown error');
-            }
-
-            if($automaticProcessingOfRenewalOrders)
-            {
-                $newService = Service::where('id', $newServiceId)->first();
-                $this->orderRenewal($api, (int)$serviceId, (int)$newServiceId, (float)$newService->amount, $rate);
-            }
-        }
+        $this->askForDetails($serviceId, $target);
+        $this->retire($serviceId, $target);
 
         return 'success';
+    }
+
+    /**
+     * Renewal on a new order: the new WHMCS service that carries it (set up at once, waiting for its certificate).
+     * WHMCS sends nothing here - the client gets the module's own e-mail.
+     */
+    protected function renewalService($params): int
+    {
+        $result = localAPI('AddOrder', [
+            'clientid'      => $params['userid'],
+            'pid'           => [$params['pid']],
+            'qty'           => [1],
+            'billingcycle'  => [$params['model']->billingcycle],
+            'configoptions' => [base64_encode(serialize($params['configoptions']))],
+            'paymentmethod' => $params['model']->paymentmethod,
+            'noinvoice'     => true,
+            'noemail'       => true,
+        ]);
+        if(($result['result'] ?? '') !== 'success')
+        {
+            throw new \Exception('The renewal order could not be created: ' . ($result['message'] ?? 'unknown error'));
+        }
+
+        localAPI('AcceptOrder', ['orderid' => $result['orderid'], 'autosetup' => true, 'sendemail' => false]);
+
+        $ids = array_filter(explode(',', (string)($result['serviceids'] ?? '')));
+        $id  = (int)reset($ids);
+        if(!$id)
+        {
+            throw new \Exception('The renewal order could not be created. Please check logs.');
+        }
+        // WHMCS gives a new service today's due date, which would bill the renewal just paid a second time: it carries
+        // the paid period instead - the renewed service's due date, which WHMCS moved on by a cycle on payment (the
+        // certificates sync later puts it on the new order's end)
+        $paidUntil = (string)Service::where('id', (int)$params['serviceid'])->value('nextduedate');
+        Service::where('id', $id)->update(['domain' => $params['domain']]
+            + ($paidUntil > date('Y-m-d') ? ['nextduedate' => $paidUntil, 'nextinvoicedate' => $paidUntil] : []));
+
+        return $id;
+    }
+
+    /**
+     * The renewal waits for the client's details: the service that carries it goes back to Awaiting Configuration
+     * (the renewing service keeps its current certificate, downloadable until it expires), remembers which order it
+     * renews - so the order the client submits is placed as that order's renewal and its days are carried over -
+     * and the client gets the "Renewal Details Required" e-mail.
+     */
+    protected function askForDetails(int $serviceId, int $target): void
+    {
+        $sslOrder  = SSL::getByServiceId($serviceId);
+        $priorItem = $sslOrder ? (string)$sslOrder->remoteid : '';
+        $priorEnd  = (string)(CertificateService::stored($serviceId)['orderFiles']['validity']['end'] ?? '');
+
+        if($serviceId === $target)
+        {
+            CertificateService::keepPreviousCertificate($serviceId);
+            SSL::where('serviceid', $serviceId)->update(['status' => 'Awaiting Configuration', 'remoteid' => '']);
+        }
+        RenewalPolicy::awaitDetails($target, $serviceId, $priorItem, $priorEnd);
+
+        $targetOrder = SSL::getByServiceId($target);
+        \ModulesGarden\TSSPlugin\App\Helpers\EmailTemplates::sendEmail(\ModulesGarden\TSSPlugin\App\Helpers\EmailTemplates::RENEWAL_DETAILS_TEMPLATE, $target, [
+            'ssl_configuration_link' => (new \ModulesGarden\Servers\TSSPlugin\app\repository\whmcs\Config())->getConfigureSSLUrl($targetOrder ? $targetOrder->id : 0, $target),
+        ]);
+        CertificateService::event($target, 'info', '[Renewal] Paid: waiting for the client to submit the renewal details');
+    }
+
+    /**
+     * Renewal on a new order: the renewed service is billed no more - the new one carries the next renewals. It stays
+     * open, its certificate downloadable, until its order ends; the renewal cron then marks it Completed.
+     */
+    protected function retire(int $serviceId, int $target): void
+    {
+        if($serviceId === $target)
+        {
+            return;
+        }
+        Service::where('id', $serviceId)->update(['billingcycle' => 'One Time']);
+        \ModulesGarden\TSSPlugin\App\Models\Request::updateOrInsert(
+            ['serviceid' => $serviceId, 'name' => 'renewedTo'],
+            ['request' => (string)$target, 'status' => 'renewed', 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]
+        );
+        CertificateService::event($serviceId, 'info', '[Renewal] Renewed as service #' . $target . ': this service is billed no more and closes when its order ends');
+        CertificateService::event($target, 'info', '[Renewal] Renewal of service #' . $serviceId);
     }
 
     /**
@@ -145,7 +201,19 @@ class Renew
         $requestRenew['renewal']['prior_order_id'] = $requestRenew['renewal']['prior_certificate_id'] = $sslOrder->remoteid;
         $requestRenew['renewal']['remaining_days'] = CertificateService::renewalDays($serviceId, $days > 0 ? $days + 1 : 0);
 
-        $newOrder  = $api->renewOrder($targetServiceId, $requestRenew);
+        try
+        {
+            $newOrder = $api->renewOrder($targetServiceId, $requestRenew);
+        }
+        catch(\Throwable $e)
+        {
+            // the vendor renews an order only inside its renewal window ("This order is not up for renewal" - a renewal
+            // paid long before the end): the paid renewal is then ordered as a new certificate with the same details;
+            // only the carried-over days are lost. When that is refused too, the caller asks the client for new details.
+            unset($requestRenew['renewal']);
+            $newOrder = $api->renewOrder($targetServiceId, $requestRenew);
+            CertificateService::event($serviceId, 'info', '[Renewal] The vendor did not take it as a renewal of the previous order (' . $e->getMessage() . '): ordered as a new certificate with the same details');
+        }
         $newItemId = SSLTrustCenterApi::getItemId($newOrder);
 
         // from here the order exists at the vendor: what follows is stored on a best effort, a failure never reports the

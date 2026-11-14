@@ -74,9 +74,9 @@ class RenewalNotifyCertificate extends AbstractCommand
         $addonConfig = (new AddonModuleRepository())->getModuleConfiguration();
         $sslSettings = $addonConfig['sslSettings'];
 
-        $auto_renew_invoice_reccuring           = (bool)$sslSettings['recurringCreateAutomaticRenewalInvoice'];
-        $renew_new_order                        = (bool)$sslSettings['renewOrderViaExistingOrder'];
-        $renew_invoice_days_reccuring           = $sslSettings['recurringDaysBeforeExpiry'];
+        // renewal invoices: from N days before the order end (App\Libs\RenewalPolicy); the module is the only one
+        // that creates them, whichever way a paid renewal is placed
+        $auto_renew_invoice_reccuring           = \ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::invoicing(\ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::CERTIFICATE);
         $send_expiration_notification_reccuring = $sslSettings['recurringSendExpirationNotifications'];
 
         $daysNotify = explode(',', $send_expiration_notification_reccuring);
@@ -164,14 +164,13 @@ class RenewalNotifyCertificate extends AbstractCommand
                     }
                 }
 
-                $savedRenewDays = $renew_invoice_days_reccuring;
-                if($daysLeft == (int)$savedRenewDays)
+                // the service falls due on the order end: its renewal invoice is created from N days before it, on or
+                // after that day (a day without a cron run loses nothing; an invoice that exists is not made again)
+                if($auto_renew_invoice_reccuring && !in_array($srv->billingcycle, ['One Time', 'Free Account'], true)
+                    && \ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::invoiceDue(\ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::CERTIFICATE, $srv->nextduedate))
                 {
-                    if(!in_array($srv->billingcycle, ['One Time', 'Free Account'], true) && $auto_renew_invoice_reccuring)
-                    {
-                        $packageLists[$srv->packageid][] = $srv;
-                        $serviceIDs[]                    = $srv->id;
-                    }
+                    $packageLists[$srv->packageid][] = $srv;
+                    $serviceIDs[]                    = $srv->id;
                 }
 
             }
@@ -191,7 +190,7 @@ class RenewalNotifyCertificate extends AbstractCommand
 
         CronCheck::updateOrCreate(['type' => self::REMINDERS_MARKER], ['last_run' => $today . ' ' . date('H:i:s'), 'last_error' => $failedIds ? json_encode($failedIds) : '']);
 
-        if(!$renew_new_order)
+        if($serviceIDs)
         {
             $output->write('Invoice Checking...');
 
@@ -239,7 +238,7 @@ class RenewalNotifyCertificate extends AbstractCommand
         }
 
         // each step on its own: the time of this run is always saved, or the job would start again every 5 minutes
-        foreach(['terminateUnpaid'] as $step)
+        foreach(['terminateUnpaid', 'closeRenewed'] as $step)
         {
             try
             {
@@ -262,6 +261,31 @@ class RenewalNotifyCertificate extends AbstractCommand
     private function terminateUnpaid()
     {
         \ModulesGarden\TSSPlugin\App\Libs\UnpaidTermination::run();
+    }
+
+    /**
+     * Renewals on a new order: the renewed service stopped being billed when the new one took over, and is marked
+     * Completed once its own order has ended (its certificate stayed downloadable until then). The order end comes
+     * from the stored order - WHMCS moved the due date on when the renewal invoice was paid.
+     */
+    private function closeRenewed()
+    {
+        $today = date('Y-m-d');
+        foreach(Request::where('name', 'renewedTo')->get(['serviceid', 'request']) as $row)
+        {
+            $serviceId = (int)$row->serviceid;
+            if(\WHMCS\Database\Capsule::table('tblhosting')->where('id', $serviceId)->value('domainstatus') !== 'Active')
+            {
+                continue;
+            }
+            $stored = \ModulesGarden\TSSPlugin\App\Libs\CertificateService::stored($serviceId);
+            $end    = \ModulesGarden\TSSPlugin\App\Libs\SslProductHelpers::getServiceDueDate((array)($stored['orderData'] ?? []));
+            if($end && $end < $today)
+            {
+                \WHMCS\Database\Capsule::table('tblhosting')->where('id', $serviceId)->update(['domainstatus' => 'Completed']);
+                \ModulesGarden\TSSPlugin\App\Libs\CertificateService::event($serviceId, 'info', '[Renewal] Order ended on ' . $end . ': service completed, renewed as service #' . (int)$row->request);
+            }
+        }
     }
 
     public function checkOrderExpireDate($expireDate)
