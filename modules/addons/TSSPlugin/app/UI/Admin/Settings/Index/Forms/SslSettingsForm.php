@@ -287,6 +287,13 @@ class SslSettingsForm extends Form implements AdminAreaInterface, AjaxComponentI
         $recurringContainer->addElement((new Text())->setText($this->renewalCheck(RenewalPolicy::SUBSCRIPTION)));
         $this->builder->addFieldInContainer($recurringContainer, (new Switcher())->setName('recurringSendExpirationNotificationsSubscription')->addClass('switcher-revert'));
         $this->builder->addFieldInContainer($recurringContainer, (new Switcher())->setName('terminateUnpaidSubscriptions')->addClass('switcher-revert'));
+        $this->builder->addFieldInContainer($recurringContainer, (new Dropdown())->setName('pendingPaymentWaitSubscription'));
+        if(RenewalPolicy::pendingWait(RenewalPolicy::SUBSCRIPTION) > 0)
+        {
+            // waiting past the renewal day: the vendor charges before the payment has cleared
+            $recurringContainer->addElement((new Text())->setText('<div class="tss-renewal-check"><p class="tss-renewal-check__warning tss-renewal-check__warning--amber">'
+                . htmlspecialchars($this->translate('pendingWaitSubscriptionRisk')) . '</p></div>'));
+        }
         $this->builder->addFieldInContainer($recurringOrdersWidget, (new Dropdown())->setName('subscriptionSlotPricing')->setDefaultValueAsFirstOption());
     }
 

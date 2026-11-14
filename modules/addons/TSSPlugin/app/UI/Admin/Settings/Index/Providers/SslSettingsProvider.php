@@ -69,6 +69,13 @@ class SslSettingsProvider extends CrudProvider
         $this->availableValues['autoReissueDaysBeforeExpire']           = array_combine($reissueDays, $reissueDays);
         $this->availableValues['recurringDaysBeforeExpirySubscription'] = $this->dayOptions(RenewalPolicy::LEAD_OPTIONS, 'recurringDaysBeforeExpirySubscription');
         $this->availableValues['recurringPaymentTermSubscription']      = $this->dayOptions(RenewalPolicy::TERM_OPTIONS, 'recurringPaymentTermSubscription');
+        // built first and assigned whole: availableValues is not a plain array, a nested write would be lost
+        $pendingWait = [];
+        foreach(RenewalPolicy::PENDING_WAIT_OPTIONS as $days)
+        {
+            $pendingWait[(string)$days] = $this->translate('pendingWait_' . $days);
+        }
+        $this->availableValues['pendingPaymentWaitSubscription']        = $pendingWait;
         $this->availableValues['subscriptionSlotPricing']               = [
             \ModulesGarden\TSSPlugin\App\Libs\SubscriptionBilling::SLOT_PRICING_PRORATED => $this->translate('subscriptionSlotPricing_prorated'),
             \ModulesGarden\TSSPlugin\App\Libs\SubscriptionBilling::SLOT_PRICING_FULL     => $this->translate('subscriptionSlotPricing_full'),
@@ -84,6 +91,8 @@ class SslSettingsProvider extends CrudProvider
         }
         // what applies: an install that never saved it keeps the choice it made for SSL before 1.5.0
         $this->data['renewReuseOrderDetails'] = RenewalPolicy::reuseDetails();
+        // as a string: the dropdown takes a numeric 0 for "nothing chosen"
+        $this->data['pendingPaymentWaitSubscription'] = (string)RenewalPolicy::pendingWait(RenewalPolicy::SUBSCRIPTION);
 
         $templates = ['' => $this->translate('moduleTemplate')];
         foreach(\WHMCS\Database\Capsule::table('tblemailtemplates')->where('type', 'general')->where('language', '')->orderBy('name')->pluck('name') as $name)
