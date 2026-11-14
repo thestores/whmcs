@@ -2,6 +2,8 @@
 
 namespace ModulesGarden\tssmodule\App\Cron;
 
+use ModulesGarden\tssmodule\App\Libs\Edition;
+
 use Exception;
 use ModulesGarden\tssmodule\App\Helpers\EmailTemplates;
 use ModulesGarden\tssmodule\App\Libs\AcmeHelpers;
@@ -69,14 +71,15 @@ class SSLCertificatesProcessing extends AbstractCommand
         $addonConfig = (new AddonModuleRepository())->getModuleConfiguration();
 
         $errorToDB = '';
+        $requests  = Edition::table('Requests');
 
         $certificatesQuery = Service::select(['tblhosting.*','tblsslorders.remoteid','tblproducts.configoption1','tblproducts.configoption9'])
             ->join('tblsslorders', 'tblsslorders.serviceid', '=', 'tblhosting.id')
             ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
-            ->join('tssmodule_Requests', 'tssmodule_Requests.serviceid', '=', 'tblhosting.id')
+            ->join($requests, $requests . '.serviceid', '=', 'tblhosting.id')
             // a new order is stored as "processing" until the gateway reports it (GoGetSSL adds the validation details
             // a few seconds after the order is placed) - without it such orders were never re-read
-            ->whereIn('tssmodule_Requests.status', ['pending', 'processing'])
+            ->whereIn($requests . '.status', ['pending', 'processing'])
             ->where('tblproducts.servertype', 'tssmodule')
             ->where('tblhosting.domainstatus', 'Active')
             ->where('tblsslorders.status', 'Configuration Submitted')

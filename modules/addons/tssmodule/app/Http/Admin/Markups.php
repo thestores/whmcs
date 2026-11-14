@@ -2,36 +2,36 @@
 
 namespace ModulesGarden\tssmodule\App\Http\Admin;
 
-use ModulesGarden\tssmodule\App\Libs\Commissions as CommissionRules;
+use ModulesGarden\tssmodule\App\Libs\Markups as MarkupRules;
 use ModulesGarden\tssmodule\App\Libs\CsrfToken;
-use ModulesGarden\tssmodule\App\UI\Admin\Commissions\Index\CommissionsContainer;
+use ModulesGarden\tssmodule\App\UI\Admin\Markups\Index\MarkupsContainer;
 use ModulesGarden\tssmodule\Core\Contracts\Controllers\AdminAreaInterface;
 use ModulesGarden\tssmodule\Core\Helper;
 use ModulesGarden\tssmodule\Core\Http\AbstractController;
 
 /**
- * Per-client commissions: list, add / change (POST), delete (link with the admin token)
+ * Client markups: list, add / change (POST), delete (link with the admin token)
  */
-class Commissions extends AbstractController implements AdminAreaInterface
+class Markups extends AbstractController implements AdminAreaInterface
 {
-    const SESSION = 'tss_commissions';
+    const SESSION = 'tss_markups';
 
     public function index()
     {
-        return Helper\view()->addElement(CommissionsContainer::class);
+        return Helper\view()->addElement(MarkupsContainer::class);
     }
 
     public function save()
     {
         return $this->run('saved', function() {
-            CommissionRules::set((int)($_POST['client_id'] ?? 0), (int)($_POST['product_id'] ?? 0), str_replace(',', '.', trim((string)($_POST['commission'] ?? ''))));
+            MarkupRules::set((int)($_POST['client_id'] ?? 0), (int)($_POST['product_id'] ?? 0), str_replace(',', '.', trim((string)($_POST['markup'] ?? ''))));
         });
     }
 
     public function delete()
     {
         return $this->run('deleted', function() {
-            CommissionRules::delete((int)($_REQUEST['id'] ?? 0));
+            MarkupRules::delete((int)($_REQUEST['id'] ?? 0));
         });
     }
 
@@ -51,6 +51,6 @@ class Commissions extends AbstractController implements AdminAreaInterface
             $_SESSION[self::SESSION]['error'] = $e->getMessage();
         }
 
-        return Helper\redirect('commissions', 'index');
+        return Helper\redirect('markups', 'index');
     }
 }

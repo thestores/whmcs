@@ -2,6 +2,8 @@
 
 namespace ModulesGarden\tssmodule\App\Libs;
 
+use ModulesGarden\tssmodule\App\Libs\Edition;
+
 use WHMCS\Database\Capsule;
 
 /**
@@ -291,7 +293,7 @@ class ProductCatalog
      */
     public static function markMissing($vendor, array $returnedIds)
     {
-        $rows = Capsule::table('tssmodule_RemoteProducts')->where('vendor', $vendor)->get(['id', 'remoteId', 'rawData']);
+        $rows = Capsule::table(Edition::table('RemoteProducts'))->where('vendor', $vendor)->get(['id', 'remoteId', 'rawData']);
         foreach($rows as $row)
         {
             $raw = json_decode((string)$row->rawData, true) ?: [];
@@ -300,7 +302,7 @@ class ProductCatalog
                 continue;
             }
             $raw['missing_since'] = date('Y-m-d');
-            Capsule::table('tssmodule_RemoteProducts')->where('id', $row->id)->update(['rawData' => json_encode($raw)]);
+            Capsule::table(Edition::table('RemoteProducts'))->where('id', $row->id)->update(['rawData' => json_encode($raw)]);
         }
     }
 

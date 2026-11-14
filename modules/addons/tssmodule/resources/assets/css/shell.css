@@ -774,7 +774,7 @@
 /* pages built from one HTML block get the same card as the widget pages */
 #layers2 .tss-pricing .tss-html,
 #layers2 .tss-log .tss-html,
-#layers2 .tss-commissions .tss-html {
+#layers2 .tss-markups .tss-html {
     display: block; padding: var(--sp-6); border: 1px solid var(--tw-border); border-radius: var(--tw-radius); background: var(--tw-surface);
 }
 /* notes above that card (right under the page header) stay on the page background */

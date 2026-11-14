@@ -369,9 +369,9 @@ add_hook('ClientAreaSecondarySidebar', 1, function($secondarySidebar) {
     }
 });
 
-// ---- Per-client commissions (Commissions page) ---- //
+// ---- Client markups (Markups page) ---- //
 
-function tss_commission_client_currency()
+function tss_markup_client_currency()
 {
     $clientId = !empty($_SESSION['uid']) ? (int)$_SESSION['uid'] : 0;
     if($clientId && function_exists('getCurrency'))
@@ -389,8 +389,8 @@ function tss_commission_client_currency()
 add_hook('OrderProductPricingOverride', 1, function($vars) {
     try
     {
-        list($clientId, $currencyId) = tss_commission_client_currency();
-        $price = \ModulesGarden\tssmodule\App\Libs\Commissions::price($clientId, (int)$vars['pid'], $vars['proddata']['billingcycle'] ?? 'annually', $currencyId);
+        list($clientId, $currencyId) = tss_markup_client_currency();
+        $price = \ModulesGarden\tssmodule\App\Libs\Markups::price($clientId, (int)$vars['pid'], $vars['proddata']['billingcycle'] ?? 'annually', $currencyId);
 
         return $price === null ? [] : ['recurring' => $price];
     }
@@ -404,10 +404,10 @@ add_hook('OrderProductPricingOverride', 1, function($vars) {
 add_hook('ClientAreaPageCart', 1, function($vars) {
     try
     {
-        list($clientId, $currencyId) = tss_commission_client_currency();
+        list($clientId, $currencyId) = tss_markup_client_currency();
         $scale = function($pricing, $pid) use ($clientId, $currencyId) {
-            $commission = \ModulesGarden\tssmodule\App\Libs\Commissions::forProduct($clientId, $pid);
-            if($commission === null || !is_array($pricing) || !Capsule::table('tblproducts')->where('id', (int)$pid)->where('servertype', 'tssmodule')->exists())
+            $markup = \ModulesGarden\tssmodule\App\Libs\Markups::forProduct($clientId, $pid);
+            if($markup === null || !is_array($pricing) || !Capsule::table('tblproducts')->where('id', (int)$pid)->where('servertype', 'tssmodule')->exists())
             {
                 return $pricing;
             }
@@ -417,7 +417,7 @@ add_hook('ClientAreaPageCart', 1, function($vars) {
                 {
                     continue;
                 }
-                $new = \ModulesGarden\tssmodule\App\Libs\Commissions::apply($amount, $commission);
+                $new = \ModulesGarden\tssmodule\App\Libs\Markups::apply($amount, $markup);
                 $pricing['rawpricing'][$cycle] = number_format($new, 2, '.', '');
                 if(isset($pricing['cycles'][$cycle]))
                 {
@@ -466,17 +466,17 @@ add_hook('ClientAreaHeadOutput', 1, function($vars) {
     }
     try
     {
-        list($clientId) = tss_commission_client_currency();
-        $commissions = [];
+        list($clientId) = tss_markup_client_currency();
+        $markups = [];
         foreach(Capsule::table('tblproducts')->where('servertype', 'tssmodule')->pluck('id') as $pid)
         {
-            $commission = \ModulesGarden\tssmodule\App\Libs\Commissions::forProduct($clientId, $pid);
-            if($commission !== null)
+            $markup = \ModulesGarden\tssmodule\App\Libs\Markups::forProduct($clientId, $pid);
+            if($markup !== null)
             {
-                $commissions[(int)$pid] = 1 + $commission / 100;
+                $markups[(int)$pid] = 1 + $markup / 100;
             }
         }
-        if(!$commissions)
+        if(!$markups)
         {
             return '';
         }
@@ -487,7 +487,7 @@ add_hook('ClientAreaHeadOutput', 1, function($vars) {
     }
 
     return '<script>(function () {
-    var factors = ' . json_encode($commissions) . ', months = {monthly: 1, quarterly: 3, semiannually: 6, annually: 12, biennially: 24, triennially: 36};
+    var factors = ' . json_encode($markups) . ', months = {monthly: 1, quarterly: 3, semiannually: 6, annually: 12, biennially: 24, triennially: 36};
     function scale(pricing, factor, prefix) {
         Object.keys(pricing || {}).forEach(function (cycle) {
             var p = pricing[cycle], raw = parseFloat(p && p.rawPrice);
