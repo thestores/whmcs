@@ -313,6 +313,12 @@ class ImportProvider extends CrudProvider
                     }
                 }
             }
+
+            // FLEX products: the client chooses a standard or a wildcard main domain (the wildcard costs more)
+            \ModulesGarden\TSSPlugin\App\Libs\MainDomain::ensureOption((int)$productId, (array)$remoteProductData, $importMargin, (float)$baseCurrencyRate);
         }
+
+        // CodeGuard plans can be upgraded to the dearer ones (the only product type that switches plans at the vendor)
+        \ModulesGarden\TSSPlugin\App\Libs\CodeGuardService::linkUpgradePaths();
     }
 }

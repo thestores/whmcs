@@ -215,10 +215,14 @@ add_hook('ClientAreaPage', 1, function($params) {
             exit;
         }
 
-        // SANs of an ordered certificate can only be added
+        // SANs of an ordered certificate can only be added; the main domain type of a FLEX certificate is fixed
         if(isset($_POST['step']) && $_POST['step'] == '2' && isset($_POST['configoption']) && is_array($_POST['configoption']))
         {
             $error = \ModulesGarden\TSSPlugin\App\Libs\SanUpgrade::downgradeError($serviceId, $_POST['configoption']);
+            if($error === '')
+            {
+                $error = \ModulesGarden\TSSPlugin\App\Libs\MainDomain::changeError((int)$serviceId, $_POST['configoption']);
+            }
             if($error !== '')
             {
                 $_SESSION['tss_upgrade_error'] = $error;

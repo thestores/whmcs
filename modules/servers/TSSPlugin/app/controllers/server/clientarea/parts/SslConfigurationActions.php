@@ -531,6 +531,8 @@ trait SslConfigurationActions
         }
 
         \ModulesGarden\TSSPlugin\App\Libs\SanUpgrade::assertWithinLimits($serviceId, $commonName, $allDomains, \ModulesGarden\TSSPlugin\App\Libs\SanUpgrade::paidQuantities($params));
+        // *. only on a wildcard product, or a FLEX product with the Wildcard choice paid
+        \ModulesGarden\TSSPlugin\App\Libs\MainDomain::assertCommonName((int)$serviceId, (string)$commonName);
 
         foreach($allDomains as $domain)
         {
