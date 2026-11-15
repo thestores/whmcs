@@ -10,6 +10,9 @@ use ModulesGarden\TSSPlugin\Components\Alert\AlertInfo;
 use ModulesGarden\TSSPlugin\Components\Alert\AlertSuccess;
 use ModulesGarden\TSSPlugin\Components\Container\Container;
 use ModulesGarden\TSSPlugin\App\Libs\Icons;
+use ModulesGarden\TSSPlugin\App\Libs\CatalogueSync;
+use ModulesGarden\TSSPlugin\Components\Tab\Tab;
+use ModulesGarden\TSSPlugin\Components\TabsWidget\TabsWidget;
 use ModulesGarden\TSSPlugin\Components\Text\Text;
 use ModulesGarden\TSSPlugin\Core\Contracts\Components\AdminAreaInterface;
 
@@ -29,15 +32,71 @@ class ProductsContainer extends Container implements AdminAreaInterface
             $this->addElement((new AlertSuccess())->setText($this->translate('notice_' . $notice['key'], ['product' => htmlspecialchars((string)$notice['product'], ENT_QUOTES, 'UTF-8', false), 'detail' => $notice['detail'] !== '' ? htmlspecialchars((string)$notice['detail'], ENT_QUOTES, 'UTF-8', false) : '-'])));
         }
 
+        $productsTab = new Tab();
+        $productsTab->setTitle($this->translate('productsTab', [], ['admin.products']));
         if(!\ModulesGarden\TSSPlugin\App\Libs\GeneralSettings::enabled('hideInfoMessages'))
         {
             $text = new Text();
             $text->setCss('tss-html');
             $text->setText($this->explanation());
-            $this->addElement($text);
+            $productsTab->addElement($text);
+        }
+        $productsTab->addElement(new DataTable());
+
+        // what changed in the provider's catalogue (M-16)
+        $changes = CatalogueSync::recent();
+        $week    = date('Y-m-d H:i:s', strtotime('-7 days'));
+        $recent  = 0;
+        foreach($changes as $change)
+        {
+            $recent += $change->created_at >= $week ? 1 : 0;
+        }
+        $changesTab = new Tab();
+        $changesTab->setTitle($this->translate('catalogueTab', [], ['admin.products']) . ($recent ? ' (' . $recent . ')' : ''));
+        $changesText = new Text();
+        $changesText->setCss('tss-html');
+        $changesText->setText($this->changesHtml($changes));
+        $changesTab->addElement($changesText);
+
+        $tabs = new TabsWidget();
+        $tabs->addTab($productsTab);
+        $tabs->addTab($changesTab);
+        $this->addElement($tabs);
+    }
+
+    /** The catalogue changes of the last 90 days, newest first */
+    protected function changesHtml($changes): string
+    {
+        $t     = function($key, array $vars = []) { return htmlspecialchars((string)$this->translate($key, $vars, ['admin.products']), ENT_QUOTES); };
+        $h     = function($value) { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); };
+
+        $html = '<div class="tss-changes"><p class="tss-changes__intro">' . $t('catalogue_intro', [':days' => CatalogueSync::TAB_DAYS])
+            . ' ' . $t('catalogue_mode', [':mode' => (string)$this->translate('catalogueSync_' . CatalogueSync::mode(), [], ['admin.settings.index.providers.finance_settings_provider'])])
+            . ' <a href="addonmodules.php?module=TSSPlugin&amp;mg-page=settings&amp;settings-page=financeSettings">' . $t('catalogue_settings') . '</a></p>';
+
+        if(!count($changes))
+        {
+            return $html . '<p class="tss-changes__empty">' . $t('catalogue_empty') . '</p></div>';
         }
 
-        $this->addElement(new DataTable());
+        $labels = CatalogueSync::typeLabels();
+        $html  .= '<div class="tss-changes__scroll"><table class="tss-changes__table"><thead><tr><th>' . $t('catalogue_date') . '</th><th>' . $t('catalogue_type') . '</th><th>' . $t('catalogue_product')
+            . '</th><th>' . $t('catalogue_change') . '</th><th>' . $t('catalogue_before') . '</th><th>' . $t('catalogue_now') . '</th><th>' . $t('catalogue_action') . '</th></tr></thead><tbody>';
+        foreach($changes as $row)
+        {
+            $product = $h($row->product_name !== '' ? $row->product_name : $row->remote_id);
+            if((int)$row->whmcs_pid)
+            {
+                $product = '<a href="configproducts.php?action=edit&amp;id=' . (int)$row->whmcs_pid . '">' . $product . '</a> <span class="tss-changes__muted">#' . (int)$row->whmcs_pid . '</span>';
+            }
+            $html .= '<tr><td class="tss-changes__date">' . $h(substr((string)$row->created_at, 0, 16)) . '</td>'
+                . '<td><span class="tss-changes__badge tss-changes__badge--' . $h($row->type) . '">' . $h($labels[$row->type] ?? $row->type) . '</span></td>'
+                . '<td>' . $product . ' <span class="tss-changes__muted">' . $h($row->vendor) . '</span></td>'
+                . '<td>' . $h($row->field !== '' ? CatalogueSync::fieldLabel($row->field) : '') . '</td>'
+                . '<td>' . $h($row->old_value) . '</td><td>' . $h($row->new_value) . '</td><td>' . $h($row->action) . '</td></tr>';
+        }
+
+        return $html . '</tbody></table></div></div>';
     }
 
     /** What the page is for and what the actions in the Manage column do */
