@@ -64,10 +64,16 @@ class AdminServicesTabFields
             }
             if(CertificateService::category($params['serviceid']) !== CertificateService::CATEGORY_TLS)
             {
-                return ['Gateway Item ID' => (int)$sslService->remoteid];
+                return ['TheSSLStore Item ID' => (int)$sslService->remoteid];
             }
 
             $fields = array_merge($this->getCertificateDetails($params, $sslService), $this->getAutoInstallDetails($params['serviceid'], (int)$params['userid']));
+            $caa    = $this->caaWarning((int)$params['serviceid']);
+            if($caa !== '')
+            {
+                // first, so the admin sees why the order does not move
+                $fields = ['CAA Record' => $caa] + $fields;
+            }
             if(CertificateService::isSectigo($params['packageid']))
             {
                 $override = CertificateService::renewalDaysOverride($params['serviceid']);
@@ -80,6 +86,39 @@ class AdminServicesTabFields
         catch(\Exception $ex)
         {
             return ['Error' => htmlspecialchars($ex->getMessage())];
+        }
+    }
+
+    /** CAA warning of a pending TLS certificate (App\Libs\CaaCheck), '' when nothing blocks it */
+    private function caaWarning($serviceId)
+    {
+        try
+        {
+            $stored  = CertificateService::stored($serviceId);
+            $waiting = [];
+            foreach((array)($stored['orderData']['items'][0]['domains'] ?? []) as $domain)
+            {
+                if(empty($domain['approved']) && !empty($domain['name']))
+                {
+                    $waiting[] = (string)$domain['name'];
+                }
+            }
+            $warning = \ModulesGarden\TSSPlugin\App\Libs\CaaCheck::forService($serviceId, $waiting);
+
+            return $warning ? \ModulesGarden\TSSPlugin\App\Libs\CaaCheck::html($warning, [
+                'title'     => 'A CAA DNS record does not allow this certificate',
+                'intro'     => '%s will not issue for these domains: their CAA DNS record allows other certificate authorities only. The client sees the same notice.',
+                'inherited' => 'record set on %s',
+                'now'       => 'CAA record now',
+                'add'       => 'Record to add',
+                'fix'         => 'The domain owner adds the record (or removes the CAA records); the CA then issues without a new order.',
+                'gateway'     => 'The certificate authority reports that its CAA check failed for this order (the client sees the same notice).',
+                'gateway_fix' => 'Fix: the domain owner adds %s to the domain\'s DNS (or removes its CAA records); the CA then issues without a new order.',
+            ]) : '';
+        }
+        catch(\Throwable $e)
+        {
+            return '';
         }
     }
 
@@ -102,7 +141,7 @@ class AdminServicesTabFields
 
         $fields = [];
         $fields['Configuration Status'] = htmlspecialchars($sslService->status);
-        $fields['Gateway Order']        = 'Order #' . (int)($stored['orderId'] ?? 0) . ' | Item #' . (int)($stored['itemId'] ?? 0)
+        $fields['TheSSLStore Order']        = 'Order #' . (int)($stored['orderId'] ?? 0) . ' | Item #' . (int)($stored['itemId'] ?? 0)
             . (!empty($stored['vendorOrderId']) ? ' | Vendor (CA) order #' . htmlspecialchars($stored['vendorOrderId']) : '');
         $fields['Vendor Status']        = '<span class="label ' . ($labels[$status] ?? 'label-default') . '">' . htmlspecialchars(ucfirst($status ?: 'unknown')) . '</span>'
             . (!empty($stored['orderedAt']) ? ' &nbsp;ordered ' . htmlspecialchars($stored['orderedAt']) : '')
@@ -137,7 +176,7 @@ class AdminServicesTabFields
 
         $fields = [];
         $fields['Configuration Status'] = htmlspecialchars($sslService->status);
-        $fields['Gateway Order']        = 'Order #' . (int)($stored['orderId'] ?? 0) . ' | Item #' . (int)($stored['itemId'] ?? 0)
+        $fields['TheSSLStore Order']        = 'Order #' . (int)($stored['orderId'] ?? 0) . ' | Item #' . (int)($stored['itemId'] ?? 0)
             . (!empty($stored['vendorOrderId']) ? ' | Vendor (CA) order #' . htmlspecialchars($stored['vendorOrderId']) : '');
         $fields['Vendor Status']        = '<span class="label ' . ($labels[$status] ?? 'label-default') . '">' . htmlspecialchars(ucfirst($status ?: 'unknown')) . '</span>'
             . (!empty($stored['orderedAt']) ? ' &nbsp;ordered ' . htmlspecialchars($stored['orderedAt']) : '')
@@ -171,7 +210,7 @@ class AdminServicesTabFields
 
         $fields = [];
         $fields['Configuration Status'] = htmlspecialchars($sslService->status);
-        $fields['Gateway Order']        = 'Order #' . (int)($stored['orderId'] ?? 0) . ' | Licence #' . (int)($stored['itemId'] ?? 0)
+        $fields['TheSSLStore Order']        = 'Order #' . (int)($stored['orderId'] ?? 0) . ' | Licence #' . (int)($stored['itemId'] ?? 0)
             . (!empty($stored['vendorOrderId']) ? ' | Vendor licence ' . htmlspecialchars($stored['vendorOrderId']) : '');
         $fields['Vendor Status']        = '<span class="label ' . ($labels[$status] ?? 'label-default') . '">' . htmlspecialchars(ucfirst($status ?: 'unknown')) . '</span>'
             . (!empty($stored['orderedAt']) ? ' &nbsp;ordered ' . htmlspecialchars($stored['orderedAt']) : '')
@@ -215,7 +254,7 @@ class AdminServicesTabFields
 
         $fields = [];
         $fields['Configuration Status'] = htmlspecialchars($sslService->status);
-        $fields['Gateway Order']        = 'Order #' . (int)($stored['orderId'] ?? 0) . ' | Item #' . (int)($stored['itemId'] ?? 0)
+        $fields['TheSSLStore Order']        = 'Order #' . (int)($stored['orderId'] ?? 0) . ' | Item #' . (int)($stored['itemId'] ?? 0)
             . (!empty($stored['vendorOrderId']) ? ' | Vendor (CA) order #' . htmlspecialchars($stored['vendorOrderId']) : '');
         $fields['Vendor Status']        = '<span class="label ' . ($labels[$status] ?? 'label-default') . '">' . htmlspecialchars(ucfirst($status ?: 'unknown')) . '</span>'
             . (!empty($stored['vendorStatus']) ? ' &nbsp;CA: ' . htmlspecialchars($stored['vendorStatus']) : '')
@@ -269,7 +308,7 @@ class AdminServicesTabFields
 
         $fields = [];
         $fields['Configuration Status'] = htmlspecialchars($sslService->status);
-        $fields['Gateway Order']        = 'Order #' . (int)($order['order']['id'] ?? 0) . ' | Item #' . (int)$sslService->remoteid
+        $fields['TheSSLStore Order']        = 'Order #' . (int)($order['order']['id'] ?? 0) . ' | Item #' . (int)$sslService->remoteid
             . (!empty($item['vendor']['id']) ? ' | Vendor (CA) order #' . htmlspecialchars($item['vendor']['id']) : '')
             . ' | ' . htmlspecialchars(Helpers::vendorToDisplay($params['configoption1']));
         $fields['Vendor Status']        = '<span class="label ' . ($labels[$status] ?? 'label-default') . '">' . htmlspecialchars(ucfirst($status ?: 'unknown')) . '</span>'

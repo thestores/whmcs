@@ -54,7 +54,7 @@ class SSLTrustCenterApi
         $credentials = self::credentialsOf($vendor);
         if($credentials === null)
         {
-            throw new \Exception('No gateway credentials configured for ' . Helpers::vendorToDisplay($vendor));
+            throw new \Exception('No API credentials configured for ' . Helpers::vendorToDisplay($vendor));
         }
 
         return new self($vendor, $credentials[0], $credentials[1], $category ?: 'tls');
@@ -63,6 +63,29 @@ class SSLTrustCenterApi
     public function getProducts()
     {
         return $this->call('/products');
+    }
+
+    /**
+     * Connection and credential check: GET /authentication/validate (204, no body) - a fraction of the product list's
+     * time and size. Throws like any call when the credentials are refused. An API without that call (404) is checked
+     * with the product list instead.
+     */
+    public function validate()
+    {
+        try
+        {
+            $this->call('/authentication/validate', [], 'GET');
+        }
+        catch(\Throwable $e)
+        {
+            if(!preg_match('/\b404\b|not found/i', $e->getMessage()))
+            {
+                throw $e;
+            }
+            $this->getProducts();
+        }
+
+        return true;
     }
 
     public function getProduct($id)
@@ -901,7 +924,7 @@ class SSLTrustCenterApi
             $error = curl_error($c);
             curl_close($c);
             $this->logCall($method, $uri, $queryData, 0, '', microtime(true) - $started, $error, ['Time: ' . $info['total_time'] . ' ' . $uri, $queryData, $error]);
-            throw new \Exception('Gateway request failed: ' . $error);
+            throw new \Exception('TheSSLStore API request failed: ' . $error);
         }
 
         $result = substr($data, $info['header_size']);

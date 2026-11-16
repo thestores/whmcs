@@ -46,7 +46,7 @@ class CertificateSyncHelpers
         // an empty answer must never replace what is stored
         if(empty($orderData['order']['status']))
         {
-            throw new Exception('The gateway returned no status for order ' . $certificate['remoteid']);
+            throw new Exception('TheSSLStore returned no status for order ' . $certificate['remoteid']);
         }
 
         // Services configured before 1.2.4 store the API order ID in tblsslorders.remoteid; since 1.2.4 it is the
@@ -93,6 +93,15 @@ class CertificateSyncHelpers
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s')
         ]);
+
+        // the CA's own CAA check failed: logged once
+        try
+        {
+            CaaCheck::afterSync((int)$certificate['id'], $orderData);
+        }
+        catch(\Throwable $e)
+        {
+        }
 
         if($orderData['order']['status'] == 'active') {
             // the order end (never the certificate end) - certificates within the order are reissued
