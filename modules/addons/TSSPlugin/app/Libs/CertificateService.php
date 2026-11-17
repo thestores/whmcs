@@ -163,7 +163,7 @@ class CertificateService
     {
         if(!self::usable($serviceId))
         {
-            throw new \Exception('The certificate is not available: the service has been cancelled or terminated.');
+            throw new \Exception(ClientText::get('certificateNotAvailable', 'The certificate is not available: the service has been cancelled or terminated.'));
         }
     }
 
@@ -211,7 +211,7 @@ class CertificateService
     {
         if(!self::serviceOpen($serviceId))
         {
-            throw new \Exception('The certificate is not available: the service has been cancelled or terminated.');
+            throw new \Exception(ClientText::get('certificateNotAvailable', 'The certificate is not available: the service has been cancelled or terminated.'));
         }
         if(self::status($serviceId) === 'active')
         {
@@ -223,7 +223,7 @@ class CertificateService
             return CertificateBundle::fromOrder($previous);
         }
 
-        throw new \Exception('The certificate has not been issued yet');
+        throw new \Exception(ClientText::get('notIssuedYet', 'The certificate has not been issued yet'));
     }
 
     /**
@@ -300,7 +300,7 @@ class CertificateService
         $ssl = self::sslOrder($serviceId);
         if(!$ssl || empty($ssl->remoteid))
         {
-            throw new \Exception('The SSL order has not been placed yet');
+            throw new \Exception(ClientText::get('orderNotPlacedYet', 'The SSL order has not been placed yet'));
         }
 
         return $ssl;
@@ -406,7 +406,7 @@ class CertificateService
         $minimum = $details['type'] === OPENSSL_KEYTYPE_EC ? 256 : 2048;
         if((int)$details['bits'] < $minimum)
         {
-            throw new \Exception(sprintf('The CSR uses a %d-bit key. Certificate authorities need at least 2048-bit RSA or 256-bit ECC - please create a new CSR.', (int)$details['bits']));
+            throw new \Exception(ClientText::get('csrKeyTooSmall', 'The CSR uses a :bits:-bit key. Certificate authorities need at least 2048-bit RSA or 256-bit ECC - please create a new CSR.', ['bits' => (int)$details['bits']]));
         }
     }
 
@@ -647,14 +647,36 @@ class CertificateService
         self::requireUsable($serviceId);
         $ssl     = self::requireOrder($serviceId);
         $subject = @openssl_csr_get_subject($csr);
-        if(!$subject || empty($subject['CN']))
+        // a certificate for public IPs (App\Libs\IpCertificate): the CSR has no common name, the main name is the
+        // first of the names (the current main name stays first)
+        $ipCertificate = IpCertificate::isProduct((int)Capsule::table('tblhosting')->where('id', (int)$serviceId)->value('packageid'));
+        if($ipCertificate)
         {
-            throw new \Exception('The CSR is not valid');
+            if($subject === false || !empty($subject['CN']))
+            {
+                throw new \Exception('This certificate needs a CSR without a common name');
+            }
+            $commonName = (string)array_key_first($methods);
+            // IP addresses are validated by file only (no mailbox, no DNS zone)
+            foreach($methods as $name => $method)
+            {
+                if(!in_array($method, ['http', 'https'], true))
+                {
+                    throw new \Exception('Use HTTP or HTTPS file validation for ' . $name);
+                }
+            }
         }
-        $commonName = $subject['CN'];
+        else
+        {
+            if(!$subject || empty($subject['CN']))
+            {
+                throw new \Exception(ClientText::get('csrNotValid', 'The CSR is not valid'));
+            }
+            $commonName = $subject['CN'];
+        }
         if(empty($methods[$commonName]))
         {
-            throw new \Exception('No validation method for ' . $commonName);
+            throw new \Exception(ClientText::get('noValidationMethod', 'No validation method for :domain:', ['domain' => $commonName]));
         }
         // the names come from posted form keys: never trust them beyond the SANs that were paid for
         SanUpgrade::assertWithinLimits($serviceId, $commonName, array_keys($methods));
@@ -668,10 +690,17 @@ class CertificateService
         $sans = [];
         foreach($methods as $domain => $method)
         {
-            if($domain !== $commonName)
+            // an IP certificate's names are all SANs, the main name too (the vendor needs at least one)
+            if($domain !== $commonName || $ipCertificate)
             {
                 $sans[] = ['name' => $domain, 'validation_method' => $method];
             }
+        }
+
+        // TheSSLStore adds the free www / base-domain name itself: it is neither sent nor stored as a SAN (FreeName)
+        if(FreeName::addedForService($serviceId))
+        {
+            $sans = FreeName::strip($sans, $commonName);
         }
 
         $api     = self::api($serviceId);

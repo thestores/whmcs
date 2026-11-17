@@ -427,7 +427,7 @@ trait AcmeActions
 
         return [
             'success' => true,
-            'message' => 'Subscription configuration submitted successfully.',
+            'message' => Lang::absoluteT('serverCA', 'home', 'acmeConfigurationSubmitted'),
         ];
     }
 
@@ -541,7 +541,7 @@ trait AcmeActions
 
         return [
             'success' => true,
-            'message' => 'Domains added successfully.',
+            'message' => Lang::absoluteT('serverCA', 'home', 'acmeDomainsAdded'),
         ];
     }
 
@@ -835,17 +835,14 @@ trait AcmeActions
     }
 
     /**
-     * Contacts sent with a subscription order: the client (the vendor sends its notices there)
+     * Contacts sent with a subscription order: the client's e-mail (the vendor sends its notices there). The gateway
+     * takes the e-mail only - any other contact field is refused ("This field was not expected", TheSSLStore sandbox
+     * 2026-11-17): primary is required, technical is accepted.
      */
     private function subscriptionContacts(array $params)
     {
         $c       = isset($params['clientsdetails']) && is_array($params['clientsdetails']) ? $params['clientsdetails'] : [];
-        $contact = [
-            'first_name' => (string)($c['firstname'] ?? ''),
-            'last_name'  => (string)($c['lastname'] ?? ''),
-            'email'      => (string)($c['email'] ?? ''),
-            'phone'      => (string)($c['phonenumberformatted'] ?? ($c['phonenumber'] ?? '')),
-        ];
+        $contact = ['email' => (string)($c['email'] ?? '')];
 
         return ['primary' => $contact, 'technical' => $contact];
     }

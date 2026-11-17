@@ -154,7 +154,7 @@
                         <button style="margin-bottom: 10px;" class="btn btn-default acme-action" data-action="createSubscription">{$MGLANG->T('acmeCreateSubscription')}</button>
                     {else}
                         {if $canAddDomains}
-                            <button style="margin-bottom: 10px;" class="btn btn-primary acme-action" data-action="addDomain">Add domain</button>
+                            <button style="margin-bottom: 10px;" class="btn btn-primary acme-action" data-action="addDomain">{$MGLANG->T('acmeAddDomainButton')}</button>
                         {/if}
                         <button style="margin-bottom: 10px;" class="btn btn-default acme-action" data-action="openUpgradeDomains">{$MGLANG->T('acmeBuyMoreDomains')}</button>
                         {if !$subscription->status || $subscription->status|lower != 'active'}
@@ -211,7 +211,7 @@
                     <h4 class="modal-title" id="acmeRemoveDomainModalLabel">{$MGLANG->T('acmeRemoveDomain')}</h4>
                 </div>
                 <div class="modal-body">
-                    Are you sure you want to remove domain <strong id="acmeRemoveDomainName"></strong>?
+                    {$MGLANG->T('acmeRemoveDomainConfirm')} <strong id="acmeRemoveDomainName"></strong>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-default" data-dismiss="modal">{$MGLANG->T('Close')}</button>
@@ -226,15 +226,15 @@
             <div class="modal-content" style="text-align: left;">
                 <div class="modal-header" style="display: block;">
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    <h4 class="modal-title" id="acmeAddDomainModalLabel">Add domain</h4>
+                    <h4 class="modal-title" id="acmeAddDomainModalLabel">{$MGLANG->T('acmeAddDomainButton')}</h4>
                 </div>
                 <div class="modal-body">
                     <div id="acmeAddDomainError" class="alert alert-danger" style="display:none;"></div>
                     <div class="alert alert-info">
-                        Available slots:
-                        Single: {$availableSingleSlots|intval}
+                        {$MGLANG->T('acmeAvailableSlots')}
+                        {$MGLANG->T('acmeSingleDomainsLabel')}: {$availableSingleSlots|intval}
                         {if $allowWildcard}
-                            | Wildcard: {$availableWildcardSlots|intval}
+                            | {$MGLANG->T('acmeWildcardDomainsLabel')}: {$availableWildcardSlots|intval}
                         {/if}
                     </div>
                     {if $availableSingleSlots > 0}
@@ -252,7 +252,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-default" data-dismiss="modal">{$MGLANG->T('Close')}</button>
-                    <button type="button" class="btn btn-primary" id="acmeConfirmAddDomain">Add domain</button>
+                    <button type="button" class="btn btn-primary" id="acmeConfirmAddDomain">{$MGLANG->T('acmeAddDomainButton')}</button>
                 </div>
             </div>
         </div>
@@ -260,6 +260,7 @@
 
     </div>
 
+<span id="acmeTexts" hidden data-error="{$MGLANG->T('anErrorOccurred')}" data-done="{$MGLANG->T('acmeDone')}" data-cancel-confirm="{$MGLANG->T('acmeCancelConfirm')}"></span>
 <script type="text/javascript">
     $(document).ready(function () {
         var clone = $('.validate-ssl-unified').clone();
@@ -273,6 +274,7 @@
 
         $(document).ready(function () {
             var serviceUrl = 'clientarea.php?action=productdetails&id={$serviceid}&json=1';
+            var acmeTexts = $('#acmeTexts');
             var selectedDomainToRemove = null;
 
             function runAction(action, data, options) {
@@ -284,7 +286,7 @@
                     // the JSON answer comes with an application/json header, so jQuery may already have parsed it
                     var payload = typeof ret === 'object' ? ret : JSON.parse(String(ret).replace("<JSONRESPONSE#", "").replace("#ENDJSONRESPONSE>", ""));
                     if (payload.result === 'error') {
-                        var errorMessage = payload.error || 'Error';
+                        var errorMessage = payload.error || acmeTexts.data('error');
                         if (typeof options.onError === 'function') {
                             options.onError(errorMessage, payload);
                         } else {
@@ -292,7 +294,7 @@
                         }
                         return;
                     }
-                    var msg = (payload.data && payload.data.message) ? payload.data.message : 'Done';
+                    var msg = (payload.data && payload.data.message) ? payload.data.message : acmeTexts.data('done');
                     if (typeof options.onSuccess === 'function') {
                         options.onSuccess(payload);
                     }
@@ -327,7 +329,7 @@
                     return;
                 }
                 if (action === 'cancelSubscription') {
-                    if (confirm('Cancel subscription immediately?')) {
+                    if (confirm(acmeTexts.data('cancelConfirm'))) {
                         runAction('cancelSubscription', {});
                     }
                     return;
