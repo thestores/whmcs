@@ -774,6 +774,7 @@ $_LANG['aisInstallMethodChanged'] = 'Die Installationsmethode wurde geändert.';
 $_LANG['aisInvalidInstallMethod'] = 'Wählen Sie AutoInstall SSL oder ACME.';
 $_LANG['subscriptionAlreadyCancelled'] = 'Das Abonnement ist bereits gekündigt.';
 $_LANG['acmeCancelledAtPeriodEnd'] = 'Die automatische Verlängerung ist bereits gestoppt: Das Abonnement endet mit Ablauf seines Zeitraums und kann vorher nicht gekündigt werden.';
+$_LANG['issuedMessageDefault'] = 'Ihr SSL-Zertifikat wurde ausgestellt und kann installiert werden. Laden Sie das Zertifikat (CRT) herunter und installieren Sie es zusammen mit dem privaten Schlüssel, der mit Ihrem CSR erstellt wurde. Folgen Sie den :link_start:offiziellen Installationsanleitungen von :brand::link_end:.';
 $_LANG['acme_slots_invoice_created'] = 'Eine Rechnung für die zusätzlichen Domains wurde erstellt. Die Domains werden hinzugefügt, sobald sie bezahlt ist.';
 
 // CodeGuard (website backup, TheSSLStore)
@@ -805,6 +806,9 @@ $_LANG['serverCA']['home']['codeGuardLicense_size_used']           = 'Genutzter 
 $_LANG['serverCA']['home']['codeGuardLicense_size_limit']          = 'Enthaltener Speicher';
 $_LANG['serverCA']['home']['codeGuardLicense_backup_period']       = 'Sicherungsintervall';
 $_LANG['serverCA']['home']['codeGuardLicense_last_backup_date']    = 'Letzte Sicherung';
+$_LANG['serverCA']['home']['codeGuardLicense_past_due']              = 'Zahlung überfällig';
+$_LANG['serverCA']['home']['codeGuardLicense_over_quota']            = 'Kontingent überschritten';
+$_LANG['serverCA']['home']['codeGuardDays']                          = ':days: Tage';
 
 // Document signing (TheSSLStore): derived from the code signing texts
 $_LANG['serverCA']['home']['dsConfigurationIntro'] = 'Geben Sie Ihre Organisation, den administrativen Kontakt und die gewünschte Zustellung des Zertifikats ein.';

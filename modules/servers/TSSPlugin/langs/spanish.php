@@ -774,6 +774,7 @@ $_LANG['aisInstallMethodChanged'] = 'Se ha cambiado el método de instalación.'
 $_LANG['aisInvalidInstallMethod'] = 'Elija AutoInstall SSL o ACME.';
 $_LANG['subscriptionAlreadyCancelled'] = 'La suscripción ya está cancelada.';
 $_LANG['acmeCancelledAtPeriodEnd'] = 'La renovación automática ya está detenida: la suscripción finaliza al término de su periodo y no se puede cancelar antes.';
+$_LANG['issuedMessageDefault'] = 'Su certificado SSL se ha emitido y está listo para instalar. Descargue el certificado (CRT) e instálelo junto con la clave privada creada con su CSR. Siga las :link_start:guías de instalación oficiales de :brand::link_end:.';
 $_LANG['acme_slots_invoice_created'] = 'Se ha creado una factura por los dominios adicionales. Los dominios se añaden en cuanto se pague.';
 
 // CodeGuard (website backup, TheSSLStore)
@@ -805,6 +806,9 @@ $_LANG['serverCA']['home']['codeGuardLicense_size_used']           = 'Almacenami
 $_LANG['serverCA']['home']['codeGuardLicense_size_limit']          = 'Almacenamiento incluido';
 $_LANG['serverCA']['home']['codeGuardLicense_backup_period']       = 'Frecuencia de copia';
 $_LANG['serverCA']['home']['codeGuardLicense_last_backup_date']    = 'Última copia';
+$_LANG['serverCA']['home']['codeGuardLicense_past_due']              = 'Pago vencido';
+$_LANG['serverCA']['home']['codeGuardLicense_over_quota']            = 'Cuota superada';
+$_LANG['serverCA']['home']['codeGuardDays']                          = ':days: días';
 
 // Document signing (TheSSLStore): derived from the code signing texts
 $_LANG['serverCA']['home']['dsConfigurationIntro'] = 'Indique su organización, el contacto administrativo y cómo quiere recibir el certificado.';

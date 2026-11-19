@@ -774,6 +774,7 @@ $_LANG['aisInstallMethodChanged'] = 'Způsob instalace byl změněn.';
 $_LANG['aisInvalidInstallMethod'] = 'Zvolte AutoInstall SSL nebo ACME.';
 $_LANG['subscriptionAlreadyCancelled'] = 'Předplatné je již zrušeno.';
 $_LANG['acmeCancelledAtPeriodEnd'] = 'Automatické obnovení je již zastaveno: předplatné končí na konci svého období a dříve ho nelze zrušit.';
+$_LANG['issuedMessageDefault'] = 'Váš SSL certifikát je vydán a připraven k instalaci. Stáhněte certifikát (CRT) a nainstalujte ho spolu se soukromým klíčem vytvořeným s vaším CSR. Postupujte podle :link_start:oficiálních návodů k instalaci od :brand::link_end:.';
 $_LANG['acme_slots_invoice_created'] = 'Byla vytvořena faktura za další domény. Domény budou přidány, jakmile bude zaplacena.';
 
 // CodeGuard (website backup, TheSSLStore)
@@ -805,6 +806,9 @@ $_LANG['serverCA']['home']['codeGuardLicense_size_used']           = 'Využité 
 $_LANG['serverCA']['home']['codeGuardLicense_size_limit']          = 'Zahrnuté úložiště';
 $_LANG['serverCA']['home']['codeGuardLicense_backup_period']       = 'Interval zálohování';
 $_LANG['serverCA']['home']['codeGuardLicense_last_backup_date']    = 'Poslední záloha';
+$_LANG['serverCA']['home']['codeGuardLicense_past_due']              = 'Platba po splatnosti';
+$_LANG['serverCA']['home']['codeGuardLicense_over_quota']            = 'Překročena kvóta';
+$_LANG['serverCA']['home']['codeGuardDays']                          = ':days: dní';
 
 // Document signing (TheSSLStore): derived from the code signing texts
 $_LANG['serverCA']['home']['dsConfigurationIntro'] = 'Zadejte organizaci, administrativní kontakt a způsob doručení certifikátu.';
