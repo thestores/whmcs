@@ -577,6 +577,10 @@ class SSLTrustCenterApi
         {
             return $this->getCodeGuardDetails($orderId);
         }
+        if((string)$category === PciService::CATEGORY)
+        {
+            return $this->call('/pci/' . (int)$orderId, [], 'GET');
+        }
 
         return $this->call('/certificates/' . rawurlencode((string)$category) . '/' . (int)$orderId, [], 'GET');
     }
@@ -658,11 +662,14 @@ class SSLTrustCenterApi
 
     /**
      * Plan + Automate: switches how the certificate is installed - AutoInstall SSL agent or the client's own ACME client
-     * ($method 'autoinstall' | 'acme'); the answer of the details call then carries the ACME account for 'acme'
+     * ($method 'autoinstall' | 'acme', sent as the gateway's 'ais' | 'acme'). The answer is 204; the details call then
+     * reports the new method and, for 'acme', the ACME account (GoGetSSL: after a few minutes).
      */
     public function changeAisInstallMethod($itemId, $method)
     {
-        return $this->call('/certificates/ais/' . (int)$itemId, ['install_method' => (string)$method], 'PATCH');
+        $value = AisHelpers::GATEWAY_METHODS[(string)$method] ?? (string)$method;
+
+        return $this->call('/certificates/ais/' . (int)$itemId . '/installation-method', ['installation_method' => $value], 'PUT');
     }
 
     /**
@@ -700,6 +707,14 @@ class SSLTrustCenterApi
     public function createDocumentSigning(array $data)
     {
         return $this->call('/certificates/' . DocumentSigningService::CATEGORY, $data);
+    }
+
+    // ------------------------------------------------------------------ HackerGuardian PCI (TheSSLStore only)
+
+    /** POST /pci: the scan account, active at once; the answer carries its login (items[0].login), the only time it is sent */
+    public function createPci(array $data)
+    {
+        return $this->call('/pci', $data);
     }
 
     // ------------------------------------------------------------------ CodeGuard (website backup, TheSSLStore only)

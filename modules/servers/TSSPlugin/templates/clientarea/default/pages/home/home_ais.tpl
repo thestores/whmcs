@@ -21,7 +21,7 @@
             <div class="tss-hero__title">
                 <span class="tss-badge tss-badge--{$aisTone}">{$aisStatus|capitalize|escape}</span>
                 <h3>{$productName|escape}</h3>
-                {if $subscription && $subscription->autoinstall_status}
+                {if $subscription && $subscription->autoinstall_status && $aisInstallMethod != 'acme'}
                     <p class="tss-hero__domain">{$MGLANG->T('aisAutoinstallStatus')}: {$subscription->autoinstall_status|capitalize|escape}</p>
                 {/if}
             </div>
@@ -88,6 +88,9 @@
                 <svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 18v3h3l11-11-3-3L2 18z"/><path d="m15 5 4 4"/><circle cx="18" cy="6" r="3"/></svg>
                 {$MGLANG->T('acmeAccountSection')}
             </h4>
+            {if !$subscription->acme_account_id}
+            <div class="tss-form"><p class="tss-note tss-note--plain">{$MGLANG->T('acmeKeysPending')}</p></div>
+            {else}
             <dl class="tss-dl">
                 <dt>{$MGLANG->T('acmeAccountId')}</dt><dd class="tss-mono">{$subscription->acme_account_id|escape}</dd>
                 {if $acmeKeysUsable}
@@ -98,6 +101,7 @@
                 {/if}
                 <dt>{$MGLANG->T('acmeServerUrl')}</dt><dd class="tss-mono" style="word-break:break-all;">{$subscription->server_url|escape}</dd>
             </dl>
+            {/if}
         </section>
         {/if}
     </div>
