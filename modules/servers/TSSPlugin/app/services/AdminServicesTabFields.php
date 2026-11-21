@@ -41,7 +41,31 @@ class AdminServicesTabFields
             . (!empty($refreshedAt) ? ' &nbsp;<small class="text-muted">' . self::t('last_refresh', 'last refresh :date:', ['date' => $refreshedAt]) . '</small>' : '');
     }
 
+    /**
+     * The tab's fields. A service of the connected second vendor (App\Libs\CrossVendor) names its own vendor in the
+     * labels: "GoGetSSL Order" in TheSSLStore Plugin, not "TheSSLStore Order".
+     */
     public function run($params)
+    {
+        $fields = $this->fields($params);
+        $vendor = \ModulesGarden\TSSPlugin\App\Libs\CrossVendor::vendorOfService((int)$params['serviceid']);
+        if(!is_array($fields) || $vendor === \ModulesGarden\TSSPlugin\App\Libs\Edition::primaryVendor())
+        {
+            return $fields;
+        }
+
+        $own    = \ModulesGarden\TSSPlugin\App\Libs\Edition::brand();
+        $theirs = \ModulesGarden\TSSPlugin\App\Libs\Edition::brandOf($vendor);
+        $result = [];
+        foreach($fields as $label => $value)
+        {
+            $result[str_replace($own, $theirs, (string)$label)] = is_string($value) ? str_replace($own, $theirs, $value) : $value;
+        }
+
+        return $result;
+    }
+
+    private function fields($params)
     {
         try
         {
@@ -88,6 +112,10 @@ class AdminServicesTabFields
             if(CertificateService::category($params['serviceid']) === CertificateService::CATEGORY_PCI)
             {
                 return $this->getPciDetails((int)$params['serviceid'], $sslService);
+            }
+            if(CertificateService::category($params['serviceid']) === CertificateService::CATEGORY_LEI)
+            {
+                return $this->getLeiDetails((int)$params['serviceid'], $sslService);
             }
             if(CertificateService::category($params['serviceid']) !== CertificateService::CATEGORY_TLS)
             {
@@ -251,6 +279,38 @@ class AdminServicesTabFields
     }
 
     /**
+     * LEI order on the module tab: status, gateway order / LEI record, LEI number, legal entity, period
+     */
+    private function getLeiDetails($serviceId, $sslService)
+    {
+        $lei    = \ModulesGarden\TSSPlugin\App\Libs\LeiService::class;
+        $stored = $lei::stored($serviceId);
+        $status = (string)($stored['status'] ?? '');
+        $labels = ['active' => 'label-success', 'processing' => 'label-info', 'pending' => 'label-info', 'incomplete' => 'label-warning', 'unpaid' => 'label-warning',
+                   'cancelled' => 'label-danger', 'rejected' => 'label-danger', 'expired' => 'label-default'];
+        $entity = (array)($stored['legalEntity'] ?? []);
+        $signer = (array)($stored['signingAuthority'] ?? []);
+
+        $fields = [];
+        $fields[AdminText::get('configuration_status', 'Configuration Status')] = htmlspecialchars($sslService->status);
+        $fields[AdminText::get('vendor_order', 'TheSSLStore Order')] = self::orderLine($stored['orderId'] ?? 0, $stored['itemId'] ?? 0, '',
+            'lei_record', 'LEI record #:id:');
+        $fields[AdminText::get('vendor_status', 'Vendor Status')]   = self::vendorStatus($status, $labels, $stored['orderedAt'] ?? '', $stored['refreshedAt'] ?? '')
+            . (!empty($stored['isRenewal']) ? ' <small class="text-muted">(' . self::t('lei_renewal', 'renewal') . ')</small>' : '');
+        $fields[AdminText::get('lei_number', 'LEI')] = !empty($stored['leiNumber'])
+            ? '<a href="' . htmlspecialchars($lei::gleifUrl($stored['leiNumber'])) . '" target="_blank" rel="noopener"><code>' . htmlspecialchars($stored['leiNumber']) . '</code></a>'
+            : '-';
+        $fields[AdminText::get('lei_legal_entity', 'Legal Entity')] = $entity
+            ? htmlspecialchars((string)($entity['legal_name'] ?? '')) . '<br><small>' . htmlspecialchars(trim(($entity['registration_authority_entity_id'] ?? '') . ', ' . ($entity['legal_jurisdiction'] ?? ''), ', ')) . '</small>'
+            : htmlspecialchars((string)($stored['legalName'] ?? '-'));
+        $fields[AdminText::get('lei_signing_authority', 'Signing Authority')] = $signer ? htmlspecialchars(trim(($signer['first_name'] ?? '') . ' ' . ($signer['last_name'] ?? ''))) : '-';
+        $fields[AdminText::get('validity', 'Validity')] = (!empty($stored['validFrom']) ? htmlspecialchars(substr($stored['validFrom'], 0, 10)) : '-') . ' &rarr; '
+            . (!empty($stored['validTill']) ? htmlspecialchars(substr($stored['validTill'], 0, 10)) : '-');
+
+        return $fields + $this->getSmimePreviousOrders($stored);
+    }
+
+    /**
      * CodeGuard licence on the module tab: status, gateway / vendor licence, contact, period and the figures the
      * gateway reports (quotas, backups - empty while the gateway answers them as null)
      */
@@ -338,7 +398,8 @@ class AdminServicesTabFields
             $previous[] = self::t('order_number', 'Order #:id:', ['id' => (int)($order['orderId'] ?? 0)]) . ' (' . htmlspecialchars((string)($order['status'] ?? ''))
                 . (!empty($order['validTill']) ? ', ' . self::t('valid_till', 'valid till :date:', ['date' => substr($order['validTill'], 0, 10)]) : '')
                 . (!empty($order['emails']) ? ', ' . htmlspecialchars(implode(', ', (array)$order['emails'])) : '')
-                . (!empty($order['organization']) ? ', ' . htmlspecialchars((string)$order['organization']) : '') . ')';
+                . (!empty($order['organization']) ? ', ' . htmlspecialchars((string)$order['organization']) : '')
+                . (!empty($order['leiNumber']) ? ', LEI ' . htmlspecialchars((string)$order['leiNumber']) : '') . ')';
         }
 
         return [AdminText::get('previous_orders', 'Previous Orders') => implode('<br>', $previous)];

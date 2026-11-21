@@ -22,6 +22,7 @@ class EmailCatalog
         'Document Signing Configuration Required' => ['order', ['ssl_configuration_link'], true],
         'CodeGuard Licence Ready'           => ['order', ['ssl_configuration_link'], true],
         'HackerGuardian PCI Configuration Required' => ['order', ['ssl_configuration_link'], true],
+        'LEI Configuration Required'        => ['order', ['ssl_configuration_link'], true],
         'DNS Validation Switched to Email'  => ['validation', ['domain', 'dcv_email', 'order_url'], true],
         'S/MIME Mailbox Not Confirmed'      => ['validation', ['smime_pending_emails', 'smime_ordered_date', 'order_url'], true],
         'Validation Warning'                => ['validation', ['domain', 'dcv_method', 'order_url'], true],
@@ -32,6 +33,7 @@ class EmailCatalog
         'Code Signing Certificate Issued'   => ['issued', ['cs_organization', 'cs_valid_till', 'cs_method', 'order_url'], true],
         'Document Signing Certificate Issued' => ['issued', ['ds_organization', 'ds_valid_till', 'ds_method', 'order_url'], true],
         'HackerGuardian PCI Scan Account Ready' => ['issued', ['pci_organization', 'pci_username', 'pci_login_url', 'order_url'], true],
+        'LEI Issued'                        => ['issued', ['lei_number', 'lei_legal_name', 'lei_valid_till', 'lei_is_renewal', 'order_url'], true],
         'Service Expiration'                => ['renewals', ['expireDaysLeft'], true],
         'S/MIME Expiration'                 => ['renewals', ['expireDaysLeft'], true],
         'Code Signing Expiration'           => ['renewals', ['expireDaysLeft'], true],
@@ -91,10 +93,19 @@ class EmailCatalog
             {
                 continue;
             }
-            // document signing, CodeGuard and HackerGuardian PCI are sold through TheSSLStore only
-            if(in_array($key, [EmailTemplates::DS_CONFIGURATION_TEMPLATE, EmailTemplates::DS_ISSUED_TEMPLATE, EmailTemplates::CODE_GUARD_READY_TEMPLATE,
-                    EmailTemplates::PCI_CONFIGURATION_TEMPLATE, EmailTemplates::PCI_READY_TEMPLATE], true)
-                && !in_array('tss', Edition::vendors(), true))
+            // LEI codes are sold through GoGetSSL only (for now): the GoGetSSL Module, or TheSSLStore Plugin with GoGetSSL connected
+            if(in_array($key, [EmailTemplates::LEI_CONFIGURATION_TEMPLATE, EmailTemplates::LEI_ISSUED_TEMPLATE], true) && !in_array('ggs', Edition::vendors(), true))
+            {
+                continue;
+            }
+            // document signing, CodeGuard and HackerGuardian PCI are sold through TheSSLStore only; a connected TheSSLStore
+            // offers CodeGuard but not document signing or PCI (App\Libs\CrossVendor)
+            if(in_array($key, [EmailTemplates::DS_CONFIGURATION_TEMPLATE, EmailTemplates::DS_ISSUED_TEMPLATE,
+                    EmailTemplates::PCI_CONFIGURATION_TEMPLATE, EmailTemplates::PCI_READY_TEMPLATE], true) && Edition::primaryVendor() !== Edition::TSS)
+            {
+                continue;
+            }
+            if($key === EmailTemplates::CODE_GUARD_READY_TEMPLATE && !in_array('tss', Edition::vendors(), true))
             {
                 continue;
             }
@@ -159,6 +170,10 @@ class EmailCatalog
             'pci_organization'       => 'Example Ltd',
             'pci_username'           => 'exampl3ab',
             'pci_login_url'          => \ModulesGarden\TSSPlugin\App\Libs\PciService::LOGIN_URL,
+            'lei_number'             => '529900T8BM49AURSDO55',
+            'lei_legal_name'         => 'Example SIA',
+            'lei_valid_till'         => date('Y-m-d', strtotime('+1 year')),
+            'lei_is_renewal'         => 0,
             'validation_type'        => 'OV',
             'is_renewal'             => 0,
             'ssl_configuration_link' => $orderUrl . '&configssl=1',

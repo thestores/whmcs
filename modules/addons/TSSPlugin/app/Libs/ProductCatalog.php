@@ -18,7 +18,7 @@ class ProductCatalog
     const OLD_LABELS = ["Additional Single domain SAN's", "Additional Wildcard domain SAN's"];
 
     /** Gateway product categories the module can sell */
-    const SUPPORTED_CATEGORIES = ['tls', 'caas', 'ais', 'smime', 'cs', 'code-guard', 'ds', 'pci'];
+    const SUPPORTED_CATEGORIES = ['tls', 'caas', 'ais', 'smime', 'cs', 'code-guard', 'ds', 'pci', 'lei'];
 
     /**
      * Products GoGetSSL lists in the "tls" category that are not SSL certificates (document signing, mark certificates)
@@ -34,7 +34,7 @@ class ProductCatalog
 
     /**
      * The module can sell the gateway product: SSL/TLS, ACME, AutoInstall SSL, S/MIME, GoGetSSL hardware code signing
-     * and TheSSLStore CodeGuard and HackerGuardian PCI scanning. Cloud code signing, document signing, mark certificates and the other website
+     * and TheSSLStore CodeGuard and HackerGuardian PCI scanning, GoGetSSL LEI codes (161, 162). Cloud code signing, document signing, mark certificates and the other website
      * security services (SiteLock, cWatch) are not supported.
      */
     public static function importable($remoteProduct)
@@ -45,6 +45,11 @@ class ProductCatalog
             return false;
         }
         if(in_array(strtolower((string)$remoteProduct->remoteId), self::HELD_BACK[strtoupper((string)$remoteProduct->vendor)] ?? [], true))
+        {
+            return false;
+        }
+        // a connected second vendor: only its exclusive products (no RapidSSL from both vendors)
+        if(!CrossVendor::offered($remoteProduct))
         {
             return false;
         }
@@ -67,6 +72,10 @@ class ProductCatalog
         if($category === PciService::CATEGORY)
         {
             return PciService::isSupportedRemoteProduct($remoteProduct->vendor, $category, $remoteProduct->remoteId);
+        }
+        if($category === LeiService::CATEGORY)
+        {
+            return LeiService::isSupportedRemoteProduct($remoteProduct->vendor, $category, $remoteProduct->remoteId);
         }
         if($category === 'tls' && preg_match(self::NOT_SSL_NAMES, (string)$remoteProduct->name))
         {
@@ -151,7 +160,7 @@ class ProductCatalog
             return false;
         }
 
-        $text = 'The product of this service is discontinued at TheSSLStore: renewal under the same product may be refused - arrange a replacement certificate';
+        $text = 'The product of this service is discontinued at ' . CrossVendor::brandOfService($serviceId) . ': renewal under the same product may be refused - arrange a replacement certificate';
         GeneralSettings::activity('Service #' . (int)$serviceId . ': ' . $text);
         CertificateService::event((int)$serviceId, 'warning', $text);
         try
@@ -198,6 +207,7 @@ class ProductCatalog
     {
         $existing = self::sanOptions($productId);
         $problems = [];
+        $product  = Capsule::table('tblproducts')->where('id', (int)$productId)->first(['configoption1']);
         foreach(self::OPTIONS as $remote => list($name))
         {
             $allowed = !empty($remoteRaw['san'][$remote . '_allowed']);
@@ -211,11 +221,10 @@ class ProductCatalog
             }
             elseif(!empty($existing[$name]) && !$allowed && !$existing[$name]->hidden)
             {
-                $problems[] = $name . ' not offered by TheSSLStore';
+                $problems[] = $name . ' not offered by ' . Edition::brandOf($product->configoption1 ?? '');
             }
         }
 
-        $product = Capsule::table('tblproducts')->where('id', (int)$productId)->first(['configoption1']);
         if($product && MainDomain::isChoice($remoteRaw, (string)$product->configoption1)
             && !Capsule::table('tblproductconfiglinks')->join('tblproductconfigoptions', 'tblproductconfigoptions.gid', '=', 'tblproductconfiglinks.gid')
                 ->where('tblproductconfiglinks.pid', (int)$productId)->where('tblproductconfigoptions.optionname', 'like', MainDomain::OPTION . '|%')->exists())

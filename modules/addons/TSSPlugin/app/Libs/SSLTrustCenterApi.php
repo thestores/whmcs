@@ -572,7 +572,7 @@ class SSLTrustCenterApi
 
     public function getCertificateDetails($category, $orderId)
     {
-        // the web security products are not certificates: they have their own path
+        // the web security products and LEI codes are not certificates: they have their own path
         if((string)$category === self::CODE_GUARD_CATEGORY)
         {
             return $this->getCodeGuardDetails($orderId);
@@ -580,6 +580,10 @@ class SSLTrustCenterApi
         if((string)$category === PciService::CATEGORY)
         {
             return $this->call('/pci/' . (int)$orderId, [], 'GET');
+        }
+        if((string)$category === LeiService::CATEGORY)
+        {
+            return $this->call('/lei/' . (int)$orderId, [], 'GET');
         }
 
         return $this->call('/certificates/' . rawurlencode((string)$category) . '/' . (int)$orderId, [], 'GET');
@@ -715,6 +719,20 @@ class SSLTrustCenterApi
     public function createPci(array $data)
     {
         return $this->call('/pci', $data);
+    }
+
+    // ------------------------------------------------------------------ LEI codes (GoGetSSL only for now)
+
+    /** POST /lei: a new LEI registration, paid at once */
+    public function createLei(array $data)
+    {
+        return $this->call('/lei', $data);
+    }
+
+    /** POST /lei/{id}/renew: the renewal order of an issued LEI; the answer is the new LEI record */
+    public function renewLei($leiId, array $data)
+    {
+        return $this->call('/lei/' . (int)$leiId . '/renew', $data);
     }
 
     // ------------------------------------------------------------------ CodeGuard (website backup, TheSSLStore only)
@@ -856,7 +874,7 @@ class SSLTrustCenterApi
             $data['api'] = [
                 'provider'  => $this->type,
                 'method'    => $method,
-                'url'       => (Edition::get() === Edition::GGS ? $this->apiUrl . $uri : '/whmcs/v2' . $uri) . ($this->isSandbox() && Edition::get() !== Edition::GGS ? ' (sandbox)' : ''),
+                'url'       => (strtoupper($this->type) === 'GGS' ? $this->apiUrl . $uri : '/whmcs/v2' . $uri) . ($this->isSandbox() && strtoupper($this->type) !== 'GGS' ? ' (sandbox)' : ''),
                 'http_code' => $httpCode ?: 'no response',
                 'duration'  => round($seconds, 2) . ' s',
                 'request'   => self::logBody($requestBody),
@@ -963,7 +981,7 @@ class SSLTrustCenterApi
             $error = curl_error($c);
             curl_close($c);
             $this->logCall($method, $uri, $queryData, 0, '', microtime(true) - $started, $error, ['Time: ' . $info['total_time'] . ' ' . $uri, $queryData, $error]);
-            throw new \Exception('TheSSLStore API request failed: ' . $error);
+            throw new \Exception(Edition::brandOf($this->type) . ' API request failed: ' . $error);
         }
 
         $result = substr($data, $info['header_size']);
@@ -1012,7 +1030,7 @@ class SSLTrustCenterApi
             {
                 try
                 {
-                    FinancePolicy::balanceAlert($response['message'], $hint);
+                    FinancePolicy::balanceAlert($response['message'], $hint, $this->type);
                 }
                 catch(\Throwable $e)
                 {

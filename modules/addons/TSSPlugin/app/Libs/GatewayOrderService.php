@@ -27,7 +27,7 @@ abstract class GatewayOrderService
     const FINAL_STATUSES = ['active', 'expired', 'cancelled', 'failed', 'rejected', 'revoked', 'refunded'];
 
     /** product types: gateway category => class */
-    const TYPES = ['smime' => SmimeService::class, 'cs' => CodeSigningService::class, 'code-guard' => CodeGuardService::class, 'ds' => DocumentSigningService::class, 'pci' => PciService::class];
+    const TYPES = ['smime' => SmimeService::class, 'cs' => CodeSigningService::class, 'code-guard' => CodeGuardService::class, 'ds' => DocumentSigningService::class, 'pci' => PciService::class, 'lei' => LeiService::class];
 
     /** @var array "category:product ID" => bool */
     protected static $products = [];
@@ -242,7 +242,7 @@ abstract class GatewayOrderService
         $itemId  = (int)($response['items'][0]['id'] ?? 0);
         if($orderId <= 0 || $itemId <= 0)
         {
-            throw new \Exception('TheSSLStore did not return an order ID');
+            throw new \Exception(CrossVendor::brandOfService($serviceId) . ' did not return an order ID');
         }
 
         $stored = static::applyDetails($stored + [

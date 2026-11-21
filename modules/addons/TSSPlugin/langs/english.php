@@ -488,6 +488,7 @@ $_LANG['admin.settings.index.forms.api_settings_form.testConnection']          =
 $_LANG['admin.settings.index.forms.api_settings_form.update_success']          = 'Settings updated successfully';
 $_LANG['admin.settings.index.forms.api_settings_form.testconnection_success']  = 'Successfully connected';
 $_LANG['admin.settings.index.providers.api_settings_provider.connectionError'] = 'Connection Error';
+$_LANG['admin.settings.index.providers.api_settings_provider.testUnsaved'] = 'Connection successful. Nothing is saved yet: click Save changes to store the settings.';
 $_LANG['admin.settings.index.providers.api_settings_provider.successAPI']      = 'The connection was successful';
 
 
@@ -651,6 +652,11 @@ $_LANG['admin.automation_queue.index.data_tables.queue.forms.reset_task_form.upd
 $_LANG['admin.products.index.products_container.productsInfo'] = 'To import a product, please select it and click the Import button.';
 $_LANG['admin.products.about_title'] = 'What you will find here';
 $_LANG['admin.products.about_intro'] = 'The products of your TheSSLStore account. Import one to sell it in WHMCS; the Status column shows what state it is in.';
+$_LANG['admin.products.connect_title_ggs'] = 'Also sell GoGetSSL products';
+$_LANG['admin.products.connect_text_ggs'] = 'Connect your GoGetSSL account to offer GoGetSSL-brand DV, OV and EV certificates, GoGetSSL code signing and LEI codes. Products TheSSLStore also sells stay hidden, so nothing is imported twice.';
+$_LANG['admin.products.connect_title_tss'] = 'Also sell TheSSLStore products';
+$_LANG['admin.products.connect_text_tss'] = 'Connect your TheSSLStore account to offer SiteLock, cWatch and CodeGuard. Products GoGetSSL also sells stay hidden, so nothing is imported twice.';
+$_LANG['admin.products.connect_link'] = 'Connect in Settings > API';
 $_LANG['admin.products.about_import_name'] = 'Import';
 $_LANG['admin.products.about_import'] = 'Select products and click Import to create them in WHMCS.';
 $_LANG['admin.products.about_hide_name'] = 'Hide';
@@ -659,6 +665,8 @@ $_LANG['admin.products.about_retire_name'] = 'Retire';
 $_LANG['admin.products.about_retire'] = 'The product is discontinued: nobody can order it, and clients with it get a "Product discontinued" notice on renewal invoices. Un-retire reverses it.';
 $_LANG['admin.products.about_fix_name'] = 'Fix options';
 $_LANG['admin.products.about_fix'] = 'Shown only when the status says "Check options": updates the configurable options of the product to match what TheSSLStore allows.';
+$_LANG['admin.products.about_intro_connected'] = 'The products of your TheSSLStore account, plus the :brand products TheSSLStore does not sell (connected in Settings > API). Import one to sell it in WHMCS; the Status column shows what state it is in.';
+$_LANG['admin.products.about_fix_connected'] = 'Shown only when the status says "Check options": updates the configurable options of the product to match what its provider allows.';
 $_LANG['admin.products.about_cancel_name'] = 'Cancel all renewals';
 $_LANG['admin.products.about_cancel'] = 'Sends a cancellation request at the end of the billing period for every active service of the product, so none renews.';
 $_LANG['admin.configuration.content.step5.productsInfo']       = 'To import a product, please select it and click the Import button.';
@@ -1244,10 +1252,21 @@ $_LANG['admin.settings.index.widgets.logs_settings_widget.subtitle']      = 'Cho
 
 $_LANG['admin.settings.index.forms.api_settings_form.tss_desc'] = 'Partner code and auth token of your The SSL Store account. Sandbox values are used in test mode.';
 $_LANG['admin.settings.index.forms.api_settings_form.ggs_desc'] = 'Partner code and auth token of your GoGetSSL account.';
+$_LANG['admin.settings.index.forms.api_settings_form.connect_ggs'] = 'Connect GoGetSSL products';
+$_LANG['admin.settings.index.forms.api_settings_form.connect_ggs_desc'] = 'Also sell GoGetSSL-brand DV, OV and EV certificates, GoGetSSL code signing and LEI codes with your GoGetSSL account. Products TheSSLStore also sells are not offered, so nothing is imported twice.';
+$_LANG['admin.settings.index.forms.api_settings_form.connect_tss'] = 'Connect TheSSLStore products';
+$_LANG['admin.settings.index.forms.api_settings_form.connect_tss_desc'] = 'Also sell SiteLock, cWatch and CodeGuard with your TheSSLStore account. Products GoGetSSL also sells are not offered, so nothing is imported twice.';
+$_LANG['admin.settings.index.forms.api_settings_form.connectOther'] = 'Connect';
+$_LANG['admin.settings.index.forms.api_settings_form.connectOther_description'] = 'On: the products above appear on the Products page for import. Off: they are hidden again (only possible while none of them is a WHMCS product).';
+$_LANG['admin.settings.index.providers.api_settings_provider.disconnectHasProducts'] = '%1$s can not be disconnected: %2$d WHMCS product(s) still use it. Delete or retire them first.';
 
 $_LANG['admin.settings.index.forms.general_settings_form.clientArea_desc'] = 'What clients see on their certificate pages.';
 $_LANG['admin.settings.index.forms.general_settings_form.interface_desc']  = 'How the module looks for administrators.';
 $_LANG['admin.settings.index.forms.general_settings_form.lifecycle_desc']  = 'What happens to a service when it is terminated or not paid.';
+$_LANG['admin.settings.index.forms.general_settings_form.lei'] = 'LEI Codes';
+$_LANG['admin.settings.index.forms.general_settings_form.lei_desc'] = 'Company search of the LEI order form.';
+$_LANG['admin.settings.index.forms.general_settings_form.openCorporatesToken'] = 'OpenCorporates API Token';
+$_LANG['admin.settings.index.forms.general_settings_form.openCorporatesToken_description'] = 'Optional. With a token the order form searches the company registers of most countries (OpenCorporates); without one it finds only entities that have or had an LEI (GLEIF, free). Leave empty to keep the saved token, enter - to remove it.';
 
 $_LANG['admin.settings.index.forms.logs_settings_form.moduleLogs_desc'] = 'Kept in the module and shown on its own pages. Switching one off stops new entries; stored entries stay until you clear them.';
 $_LANG['admin.settings.index.forms.logs_settings_form.whmcsLogs_desc']  = 'Written into WHMCS itself and read there, not in this module.';
@@ -1509,6 +1528,10 @@ $_LANG['admin.emails.name_document_signing_configuration_required'] = 'Document 
 $_LANG['admin.emails.when_document_signing_configuration_required'] = 'Sent when a document signing service is created: the client enters the organization, administrator and token choice.';
 $_LANG['admin.emails.name_document_signing_certificate_issued'] = 'Document signing certificate issued';
 $_LANG['admin.emails.when_document_signing_certificate_issued'] = 'Sent when the certificate authority issues the document signing certificate.';
+$_LANG['admin.emails.name_lei_configuration_required'] = 'LEI: order details required';
+$_LANG['admin.emails.when_lei_configuration_required'] = 'Sent when an LEI service is created or its renewal needs the client: the client enters the legal entity and the signing person.';
+$_LANG['admin.emails.name_lei_issued'] = 'LEI issued';
+$_LANG['admin.emails.when_lei_issued'] = 'Sent when the LEI issuer issues or renews the LEI code.';
 $_LANG['admin.emails.name_codeguard_licence_ready'] = 'CodeGuard licence ready';
 $_LANG['admin.emails.when_codeguard_licence_ready'] = 'Sent when a CodeGuard licence is set up, with the way to its dashboard.';
 $_LANG['admin.emails.name_hackerguardian_pci_configuration_required'] = 'HackerGuardian PCI: order details required';
