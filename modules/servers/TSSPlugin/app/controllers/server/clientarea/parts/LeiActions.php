@@ -1,11 +1,11 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\app\controllers\server\clientarea\parts;
+namespace TSSPlugin\Server\app\controllers\server\clientarea\parts;
 
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\SSL;
-use ModulesGarden\Servers\TSSPlugin\core\Lang;
-use ModulesGarden\TSSPlugin\App\Libs\LeiCompanySearch;
-use ModulesGarden\TSSPlugin\App\Libs\LeiService;
+use TSSPlugin\Server\app\models\whmcs\SSL;
+use TSSPlugin\Server\core\Lang;
+use TSSPlugin\App\Libs\ProductLines\LeiCompanySearch;
+use TSSPlugin\App\Libs\ProductLines\LeiService;
 use WHMCS\Database\Capsule;
 
 /**
@@ -17,7 +17,7 @@ trait LeiActions
     /**
      * Service page: the order form while the service waits for configuration, else the LEI status
      */
-    private function indexLeiHTML($input, $vars = array())
+    private function indexLeiHTML($input, $vars = [])
     {
         $serviceId = (int)$input['params']['serviceid'];
         $ssl       = SSL::getByServiceId($serviceId);
@@ -47,9 +47,10 @@ trait LeiActions
             }
         }
 
-        $status = strtolower((string)($stored['status'] ?? 'processing'));
-        $tones  = ['active' => 'ok', 'processing' => 'wait', 'pending' => 'wait', 'incomplete' => 'warn', 'unpaid' => 'warn',
-                   'rejected' => 'bad', 'cancelled' => 'off', 'expired' => 'off'];
+        $status = LeiService::displayStatus($stored);
+        $tones  = ['active' => 'ok', 'processing' => 'wait', 'pending' => 'wait', 'user_confirmed' => 'wait', 'pre_issue' => 'wait',
+                   'need_action' => 'warn', 'incomplete' => 'warn', 'unpaid' => 'warn',
+                   'failed' => 'bad', 'rejected' => 'bad', 'cancelled' => 'off', 'revoked' => 'off', 'expired' => 'off'];
         $entity = (array)($stored['legalEntity'] ?? []);
         $signer = (array)($stored['signingAuthority'] ?? []);
 
@@ -61,8 +62,11 @@ trait LeiActions
         $vars['leiLegalName']    = (string)($stored['legalName'] ?? Capsule::table('tblhosting')->where('id', $serviceId)->value('domain'));
         $vars['leiRegistration'] = (string)($entity['registration_authority_entity_id'] ?? '');
         $vars['leiJurisdiction'] = (string)($entity['legal_jurisdiction'] ?? '');
-        $vars['leiLegalAddress'] = $this->leiAddressText((array)($stored['registeredLegalAddress'] ?? ($entity['legal_address'] ?? [])));
-        $vars['leiHqAddress']    = $this->leiAddressText((array)($stored['registeredHeadquartersAddress'] ?? ($entity['headquarters_address'] ?? [])));
+        // the data as submitted to the issuer (also what the client confirms)
+        $vars['leiLegalAddress'] = $this->leiAddressText((array)($entity['legal_address'] ?? []));
+        $vars['leiHqAddress']    = $this->leiAddressText((array)($entity['headquarters_address'] ?? []));
+        $vars['leiRaCode']       = (string)($stored['registrationAuthorityId'] ?? '');
+        $vars['leiNeedsConfirm'] = LeiService::needsConfirmation($stored);
         $vars['leiSigner']       = trim(($signer['first_name'] ?? '') . ' ' . ($signer['last_name'] ?? ''));
         $vars['leiIsRenewal']    = !empty($stored['isRenewal']);
         $vars['leiItemId']       = (int)($stored['itemId'] ?? 0);
@@ -122,7 +126,7 @@ trait LeiActions
     /**
      * Order: a new LEI, or the renewal of the issued one (lei_mode = renew)
      */
-    public function createLeiJSON($input, $vars = array())
+    public function createLeiJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
         $serviceId = (int)$input['params']['serviceid'];
@@ -179,7 +183,7 @@ trait LeiActions
     /**
      * Company search of the order form (OpenCorporates when configured, GLEIF always)
      */
-    public function searchLeiCompanyJSON($input, $vars = array())
+    public function searchLeiCompanyJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
         if(!LeiService::isLeiWhmcsProduct((int)$input['params']['pid']))
@@ -190,7 +194,7 @@ trait LeiActions
         return ['results' => LeiCompanySearch::search((string)($input['query'] ?? ''), (string)($input['country'] ?? ''))];
     }
 
-    public function refreshLeiDetailsJSON($input, $vars = array())
+    public function refreshLeiDetailsJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
         $serviceId = (int)$input['params']['serviceid'];
@@ -201,6 +205,23 @@ trait LeiActions
         LeiService::refresh($serviceId);
 
         return ['success' => true, 'message' => Lang::absoluteT('smimeDetailsRefreshed')];
+    }
+
+    /** the client confirms the submitted data the issuer waits for */
+    public function confirmLeiJSON($input, $vars = [])
+    {
+        $this->requireCsrfToken();
+        $serviceId = (int)$input['params']['serviceid'];
+        if(!LeiService::isOrdered($serviceId))
+        {
+            throw new \Exception($this->leiText('leiNotOrderedYet', 'The LEI has not been ordered yet'));
+        }
+        if(LeiService::confirm($serviceId) === null)
+        {
+            throw new \Exception($this->leiText('leiNotWaitingConfirmation', 'The LEI issuer is not waiting for a confirmation any more. Reload the page to see the current status.'));
+        }
+
+        return ['success' => true, 'message' => $this->leiText('leiConfirmedMessage', 'Thank you. The LEI issuer continues with the registration.')];
     }
 
     /** "Legal name: this field is required." from [language key, field] */

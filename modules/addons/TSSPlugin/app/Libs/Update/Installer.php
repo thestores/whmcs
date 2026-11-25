@@ -1,9 +1,9 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Libs\Update;
+namespace TSSPlugin\App\Libs\Update;
 
-use ModulesGarden\TSSPlugin\App\Libs\Edition;
-use ModulesGarden\TSSPlugin\App\Libs\GeneralSettings;
+use TSSPlugin\App\Libs\Support\Edition;
+use TSSPlugin\App\Libs\Support\GeneralSettings;
 use WHMCS\Database\Capsule;
 
 /**

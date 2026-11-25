@@ -1,10 +1,10 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\ClientArea;
+namespace TSSPlugin\App\ClientArea;
 
-use ModulesGarden\Servers\TSSPlugin\core\Lang;
-use ModulesGarden\TSSPlugin\App\Libs\ClientSslSummary;
-use ModulesGarden\TSSPlugin\App\Libs\GeneralSettings;
+use TSSPlugin\Server\core\Lang;
+use TSSPlugin\App\Libs\Certificates\ClientSslSummary;
+use TSSPlugin\App\Libs\Support\GeneralSettings;
 
 /**
  * Client area pages of the addon (index.php?m=TSSPlugin): the client's SSL certificates filtered like the
@@ -101,11 +101,11 @@ class SslPages
             $vars['form']     = array_merge($vars['form'], array_map('strval', array_filter($_POST, 'is_scalar')));
             try
             {
-                if(!\ModulesGarden\TSSPlugin\App\Libs\CsrfToken::valid(isset($_POST['token']) ? $_POST['token'] : ''))
+                if(!\TSSPlugin\App\Libs\Support\CsrfToken::valid(isset($_POST['token']) ? $_POST['token'] : ''))
                 {
-                    throw new \Exception(\ModulesGarden\TSSPlugin\App\Libs\ClientText::get('toolsPageExpired', 'The page expired - reload it and try again.'));
+                    throw new \Exception(\TSSPlugin\App\Libs\Support\ClientText::get('toolsPageExpired', 'The page expired - reload it and try again.'));
                 }
-                $tools = '\ModulesGarden\TSSPlugin\App\Libs\SslTools';
+                $tools = '\TSSPlugin\App\Libs\Certificates\SslTools';
                 switch($action)
                 {
                     case 'decodeCsr':
@@ -138,7 +138,7 @@ class SslPages
                         echo $converted['content'];
                         exit;
                     default:
-                        throw new \Exception(\ModulesGarden\TSSPlugin\App\Libs\ClientText::get('toolsChooseTool', 'Choose a tool.'));
+                        throw new \Exception(\TSSPlugin\App\Libs\Support\ClientText::get('toolsChooseTool', 'Choose a tool.'));
                 }
             }
             catch(\Exception $e)
@@ -166,11 +166,11 @@ class SslPages
     {
         self::bootLang();
 
-        $keys  = ['certificatesTitle', 'domainsTitle', 'summaryTitle', 'viewAll', 'total', 'unpaid', 'processing', 'expires_soon',
+        $keys  = ['certificatesTitle', 'domainsTitle', 'summaryTitle', 'viewAll', 'total', 'unpaid', 'awaiting', 'processing', 'expires_soon',
                   'domain', 'product', 'status', 'validTill', 'nextDueDate', 'manage', 'payInvoice', 'noCertificates', 'search',
                   'searchPlaceholder', 'allStatuses', 'activeOnly', 'inactiveOnly', 'history', 'ordered', 'validFrom', 'noDomains',
                   'byDomain', 'listView', 'certificate', 'status_active', 'status_processing', 'status_pending', 'status_cancelled',
-                  'status_expired', 'status_rejected', 'status_revoked', 'status_awaiting', 'sslTools'];
+                  'status_expired', 'status_rejected', 'status_revoked', 'status_awaiting', 'status_terminated', 'sslTools'];
         $texts = [];
         foreach($keys as $key)
         {
@@ -206,16 +206,16 @@ class SslPages
 
     protected static function bootLang()
     {
-        if(!class_exists('\ModulesGarden\Servers\TSSPlugin\Loader', false))
+        if(!class_exists('\TSSPlugin\Server\Loader', false))
         {
             require_once dirname(__DIR__, 4) . DIRECTORY_SEPARATOR . 'servers' . DIRECTORY_SEPARATOR . 'TSSPlugin' . DIRECTORY_SEPARATOR . 'Loader.php';
-            new \ModulesGarden\Servers\TSSPlugin\Loader();
+            new \TSSPlugin\Server\Loader();
         }
         if(!defined('DS'))
         {
             define('DS', DIRECTORY_SEPARATOR);
         }
         // The server module kernel loads its language files (english + client's language + langs/overrides)
-        \ModulesGarden\Servers\TSSPlugin\Server::I();
+        \TSSPlugin\Server\Server::I();
     }
 }

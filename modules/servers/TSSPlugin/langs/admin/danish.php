@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Admin area texts of the server module (service tab, module buttons) - see App\Libs\AdminText.
+ * Admin area texts of the server module (service tab, module buttons) - see App\Libs\Support\AdminText.
  * Separate from the client area language files in the folder above. Own changes go into
  * langs/admin/overrides/danish.php (same format, only the keys you change); they survive module updates.
  * :name: placeholders are filled in by the module.
@@ -47,6 +47,13 @@ $_LANG['vendor_licence']                = 'Leverandørlicens :id:';
 $_LANG['ordered_at']                    = 'bestilt :date:';
 $_LANG['last_refresh']                  = 'senest opdateret :date:';
 $_LANG['last_synchronized']             = 'senest synkroniseret :date:';
+$_LANG['incomplete_bought'] = 'købt, venter på oplysningerne';
+$_LANG['certificate_token'] = 'Certifikattoken';
+$_LANG['certificate_token_hint'] = 'Fuldfører ordren: kunden kan bruge det i cPanel, Plesk og andre plugins eller indsende oplysningerne på konfigurationssiden.';
+$_LANG['certificate_token_unread'] = 'Endnu ikke læst fra TheSSLStore, prøves igen inden for en time';
+$_LANG['vendor_notice_failed'] = 'Der er noget galt med denne ordre hos TheSSLStore: den kunne ikke behandles. Kontakt TheSSLStore-support for at finde årsagen. Kunden bliver bedt om at kontakte din support.';
+$_LANG['vendor_notice_unpaid'] = 'Ordren er stadig ikke betalt hos TheSSLStore. Kontroller saldoen på din TheSSLStore-konto, eller kontakt TheSSLStore-support. Kunden bliver bedt om at kontakte din support.';
+$_LANG['vendor_notice_new_order'] = 'Ordren sendes til certifikatudstederen. Den bør blive accepteret inden for få minutter.';
 $_LANG['ca_status']                     = 'CA: :status:';
 $_LANG['renewal_days_auto']             = 'auto';
 $_LANG['renewal_days_hint']             = '0-:max: dage overført til fornyelsesordren (Sectigo). Tom = den globale indstilling eller certifikatets resterende dage.';

@@ -1,10 +1,10 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Cron;
+namespace TSSPlugin\App\Cron;
 
-use ModulesGarden\TSSPlugin\App\UI\Admin\Home\Index\Shared\CronStatus;
-use ModulesGarden\TSSPlugin\Core\CommandLine\AbstractCommand;
-use ModulesGarden\TSSPlugin\Core\ModuleConstants;
+use TSSPlugin\App\Libs\Dashboard\CronStatus;
+use TSSPlugin\App\Kernel\Console\Command;
+use TSSPlugin\App\Kernel\Kernel;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -16,7 +16,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *
  *   php -q {WHMCS}/modules/addons/TSSPlugin/cron/cron.php RunAll
  */
-class RunAll extends AbstractCommand
+class RunAll extends Command
 {
     protected $name = 'RunAll';
 
@@ -27,12 +27,21 @@ class RunAll extends AbstractCommand
         $background = stripos(PHP_OS, 'WIN') !== 0 && function_exists('exec')
             && !in_array('exec', array_map('trim', explode(',', (string)ini_get('disable_functions'))), true);
         $php        = PHP_BINARY !== '' && is_executable(PHP_BINARY) && stripos(basename(PHP_BINARY), 'fpm') === false ? PHP_BINARY : 'php';
-        $script     = ModuleConstants::getFullPath('cron', 'cron.php');
+        $script     = Kernel::path('cron', 'cron.php');
 
         // a new module release: looked for once a day (the dashboard shows it)
         try
         {
-            \ModulesGarden\TSSPlugin\App\Libs\Update\Release::check();
+            \TSSPlugin\App\Libs\Update\Release::check();
+        }
+        catch(\Throwable $e)
+        {
+        }
+
+        // the reseller balance: read once an hour, the administrators are warned when it is low
+        try
+        {
+            \TSSPlugin\App\Libs\Billing\BalanceMonitor::run();
         }
         catch(\Throwable $e)
         {

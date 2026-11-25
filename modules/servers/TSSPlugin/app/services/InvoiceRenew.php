@@ -1,13 +1,13 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\app\services;
+namespace TSSPlugin\Server\app\services;
 
 
-use ModulesGarden\TSSPlugin\App\Helpers\EmailTemplates;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Models\Invoice;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Models\InvoiceItem;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Models\Service;
+use TSSPlugin\App\Helpers\EmailTemplates;
+use TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
+use TSSPlugin\App\Models\Whmcs\Invoice;
+use TSSPlugin\App\Models\Whmcs\InvoiceItem;
+use TSSPlugin\App\Models\Whmcs\Service;
 use WHMCS\Database\Capsule;
 
 class InvoiceRenew {
@@ -109,7 +109,7 @@ class InvoiceRenew {
             $message = 'This service is billed once and cannot be renewed here. Please place a new order.';
             try
             {
-                $translated = (string)\ModulesGarden\Servers\TSSPlugin\core\Lang::absoluteT('renew_not_recurring');
+                $translated = (string)\TSSPlugin\Server\core\Lang::absoluteT('renew_not_recurring');
                 $message    = $translated !== '' && $translated !== 'renew_not_recurring' ? $translated : $message;
             }
             catch(\Throwable $e)
@@ -125,10 +125,10 @@ class InvoiceRenew {
             $invoiceItemDescription = $service['name'] . ($service['domain'] ? ' - ' . $service['domain'] : '' ) . ' (' . $service['nextduedate'] . ' - ' . $endDate . ') - Renewal';
         }
 
-        // due the payment term after today (App\Libs\RenewalPolicy); a term longer than the lead puts it after the
+        // due the payment term after today (App\Libs\Billing\RenewalPolicy); a term longer than the lead puts it after the
         // order end, which the settings page warns about
         $invoiceDate    = date('Y-m-d');
-        $invoiceDueDate = \ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::invoiceDueDate(\ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::CERTIFICATE, $invoiceDate);
+        $invoiceDueDate = \TSSPlugin\App\Libs\Billing\RenewalPolicy::invoiceDueDate(\TSSPlugin\App\Libs\Billing\RenewalPolicy::CERTIFICATE, $invoiceDate);
 
         $results = localAPI('CreateInvoice', [
             'userid' => $service['userid'],
@@ -149,11 +149,11 @@ class InvoiceRenew {
         InvoiceItem::where('invoiceid', $invoiceId)->update(['type' => 'Hosting', 'relid' => $serviceId]);
         // a renewal that costs nothing (0.00) is paid at once, so the renewal starts (WHMCS renews the service as for
         // a paid invoice); the client gets no invoice to pay
-        if(!\ModulesGarden\TSSPlugin\App\Libs\ZeroInvoice::settle($invoiceId, 'renewal of service #' . (int)$serviceId))
+        if(!\TSSPlugin\App\Libs\Billing\ZeroInvoice::settle($invoiceId, 'renewal of service #' . (int)$serviceId))
         {
             EmailTemplates::sendRenewalInvoiceEmail($serviceId, $invoiceId);
         }
-        \ModulesGarden\TSSPlugin\App\Libs\ProductCatalog::noticeIfDiscontinued($serviceId);
+        \TSSPlugin\App\Libs\Products\ProductCatalog::noticeIfDiscontinued($serviceId);
 
         return $invoiceId;
     }

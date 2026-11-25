@@ -1,13 +1,13 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\app\services;
+namespace TSSPlugin\Server\app\services;
 
-use ModulesGarden\Servers\TSSPlugin\app\repository\whmcs\Domain;
-use ModulesGarden\Servers\TSSPlugin\core\Lang;
-use ModulesGarden\Servers\TSSPlugin\core\Smarty;
-use ModulesGarden\TSSPlugin\App\Libs\SSLTrustCenterApi;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\ProductRepository;
+use TSSPlugin\Server\app\repository\whmcs\Domain;
+use TSSPlugin\Server\core\Lang;
+use TSSPlugin\Server\core\Smarty;
+use TSSPlugin\App\Libs\Gateway\SSLTrustCenterApi;
+use TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
+use TSSPlugin\App\Repositories\Whmcs\ProductRepository;
 
 class SSLStepTwo
 {

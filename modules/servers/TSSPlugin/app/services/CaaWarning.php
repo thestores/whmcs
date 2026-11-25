@@ -1,11 +1,11 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\app\services;
+namespace TSSPlugin\Server\app\services;
 
-use ModulesGarden\Servers\TSSPlugin\core\Lang;
-use ModulesGarden\TSSPlugin\App\Libs\CaaCheck;
+use TSSPlugin\Server\core\Lang;
+use TSSPlugin\App\Libs\Certificates\CaaCheck;
 
-/** The CAA warning box on the client's pending certificate page (texts in the client's language) - see App\Libs\CaaCheck */
+/** The CAA warning box on the client's pending certificate page (texts in the client's language) - see App\Libs\Certificates\CaaCheck */
 class CaaWarning
 {
     /** Pending certificate page: the names not validated yet; '' when nothing blocks them */

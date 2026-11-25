@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Admin area texts of the server module (service tab, module buttons) - see App\Libs\AdminText.
+ * Admin area texts of the server module (service tab, module buttons) - see App\Libs\Support\AdminText.
  * Separate from the client area language files in the folder above. Own changes go into
  * langs/admin/overrides/german.php (same format, only the keys you change); they survive module updates.
  * :name: placeholders are filled in by the module.
@@ -47,6 +47,13 @@ $_LANG['vendor_licence']                = 'Anbieterlizenz :id:';
 $_LANG['ordered_at']                    = 'bestellt am :date:';
 $_LANG['last_refresh']                  = 'zuletzt aktualisiert :date:';
 $_LANG['last_synchronized']             = 'zuletzt synchronisiert :date:';
+$_LANG['incomplete_bought'] = 'gekauft, wartet auf die Daten';
+$_LANG['certificate_token'] = 'Zertifikats-Token';
+$_LANG['certificate_token_hint'] = 'Schließt die Bestellung ab: Der Kunde kann es in cPanel, Plesk und anderen Plugins verwenden oder die Daten auf der Konfigurationsseite übermitteln.';
+$_LANG['certificate_token_unread'] = 'Noch nicht von TheSSLStore gelesen, erneuter Versuch innerhalb einer Stunde';
+$_LANG['vendor_notice_failed'] = 'Mit dieser Bestellung bei TheSSLStore stimmt etwas nicht: Sie konnte nicht bearbeitet werden. Wenden Sie sich an den TheSSLStore-Support, um die Ursache zu prüfen. Der Kunde wird gebeten, Ihren Support zu kontaktieren.';
+$_LANG['vendor_notice_unpaid'] = 'Die Bestellung ist bei TheSSLStore noch nicht bezahlt. Prüfen Sie das Guthaben Ihres TheSSLStore-Kontos oder wenden Sie sich an den TheSSLStore-Support. Der Kunde wird gebeten, Ihren Support zu kontaktieren.';
+$_LANG['vendor_notice_new_order'] = 'Die Bestellung wird an die Zertifizierungsstelle gesendet. Sie sollte innerhalb weniger Minuten angenommen werden.';
 $_LANG['ca_status']                     = 'CA: :status:';
 $_LANG['renewal_days_auto']             = 'auto';
 $_LANG['renewal_days_hint']             = '0–:max: Tage, die in die Verlängerungsbestellung übernommen werden (Sectigo). Leer = globale Einstellung oder die Resttage des Zertifikats.';

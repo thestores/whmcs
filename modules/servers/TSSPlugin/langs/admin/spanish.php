@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Admin area texts of the server module (service tab, module buttons) - see App\Libs\AdminText.
+ * Admin area texts of the server module (service tab, module buttons) - see App\Libs\Support\AdminText.
  * Separate from the client area language files in the folder above. Own changes go into
  * langs/admin/overrides/spanish.php (same format, only the keys you change); they survive module updates.
  * :name: placeholders are filled in by the module.
@@ -47,6 +47,13 @@ $_LANG['vendor_licence']                = 'Licencia del proveedor :id:';
 $_LANG['ordered_at']                    = 'pedido el :date:';
 $_LANG['last_refresh']                  = 'última actualización :date:';
 $_LANG['last_synchronized']             = 'última sincronización :date:';
+$_LANG['incomplete_bought'] = 'comprado, a la espera de sus datos';
+$_LANG['certificate_token'] = 'Token del certificado';
+$_LANG['certificate_token_hint'] = 'Completa el pedido: el cliente puede usarlo en cPanel, Plesk y otros plugins, o enviar los datos en la página de configuración.';
+$_LANG['certificate_token_unread'] = 'Aún no leído de TheSSLStore, se reintenta en una hora';
+$_LANG['vendor_notice_failed'] = 'Algo va mal con este pedido en TheSSLStore: no se ha podido procesar. Contacte con el soporte de TheSSLStore para comprobar el motivo. Se pide al cliente que contacte con su soporte.';
+$_LANG['vendor_notice_unpaid'] = 'El pedido sigue sin pagar en TheSSLStore. Compruebe el saldo de su cuenta de TheSSLStore o contacte con el soporte de TheSSLStore. Se pide al cliente que contacte con su soporte.';
+$_LANG['vendor_notice_new_order'] = 'El pedido se está enviando a la autoridad de certificación. Debería aceptarse en unos minutos.';
 $_LANG['ca_status']                     = 'CA: :status:';
 $_LANG['renewal_days_auto']             = 'auto';
 $_LANG['renewal_days_hint']             = '0-:max: días trasladados al pedido de renovación (Sectigo). Vacío = el ajuste global o los días restantes del certificado.';

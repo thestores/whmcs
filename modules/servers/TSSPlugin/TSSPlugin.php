@@ -1,21 +1,34 @@
 <?php
 
-use ModulesGarden\Servers\TSSPlugin\app\controllers\server\admin\Actions;
-use ModulesGarden\Servers\TSSPlugin\Server;
+use TSSPlugin\Server\app\controllers\server\admin\Actions;
+use TSSPlugin\Server\Server;
 
 if(!defined('DS'))define('DS',DIRECTORY_SEPARATOR);
 
 require_once __DIR__.DS.'Loader.php';
-new \ModulesGarden\Servers\TSSPlugin\Loader();
+new \TSSPlugin\Server\Loader();
 
 // Edition name (GoGetSSL Module / TheSSLStore Plugin) - loaded directly, without booting the addon framework
-if(file_exists(dirname(__DIR__, 2).DS.'addons'.DS.'TSSPlugin'.DS.'app'.DS.'Libs'.DS.'Edition.php'))
+if(file_exists(dirname(__DIR__, 2).DS.'addons'.DS.'TSSPlugin'.DS.'app'.DS.'Libs'.DS.'Support'.DS.'Edition.php'))
 {
-    require_once dirname(__DIR__, 2).DS.'addons'.DS.'TSSPlugin'.DS.'app'.DS.'Libs'.DS.'Edition.php';
+    require_once dirname(__DIR__, 2).DS.'addons'.DS.'TSSPlugin'.DS.'app'.DS.'Libs'.DS.'Support'.DS.'Edition.php';
 }
 
-\ModulesGarden\Servers\TSSPlugin\Server::I();
+\TSSPlugin\Server\Server::I();
 
+// files updated by copying, without the addon upgrade: the database changes (App\Database\Schema) are applied here
+// too; once current it is one query per request
+try
+{
+    if(class_exists('\TSSPlugin\App\Database\Schema'))
+    {
+        \TSSPlugin\App\Database\Schema::migrate();
+    }
+}
+catch(\Throwable $e)
+{
+    // the service actions go on; the next request tries again
+}
 
 
 if (!defined("WHMCS")) {
@@ -24,16 +37,16 @@ if (!defined("WHMCS")) {
 
 /**
  * The answer for a call the module must not run as an ordinary service; null for any other:
- *  - a WHMCS product addon (App\Libs\AddonCertificates): WHMCS passes the parent service, the certificate lives on the
+ *  - a WHMCS product addon (App\Libs\Certificates\AddonCertificates): WHMCS passes the parent service, the certificate lives on the
  *    addon's own certificate service
- *  - a certificate kept as a record of the legacy module (App\Libs\RecordOnly)
+ *  - a certificate kept as a record of the legacy module (App\Libs\Certificates\RecordOnly)
  */
 function TSSPlugin_recordOnlyGuard($function, $params) {
-    if(!empty($params['addonId']) && class_exists('\ModulesGarden\TSSPlugin\App\Libs\AddonCertificates')) {
-        return \ModulesGarden\TSSPlugin\App\Libs\AddonCertificates::guard($function, (array)$params);
+    if(!empty($params['addonId']) && class_exists('\TSSPlugin\App\Libs\Certificates\AddonCertificates')) {
+        return \TSSPlugin\App\Libs\Certificates\AddonCertificates::guard($function, (array)$params);
     }
     try {
-        return class_exists('\ModulesGarden\TSSPlugin\App\Libs\RecordOnly') ? \ModulesGarden\TSSPlugin\App\Libs\RecordOnly::guard($function, $params) : null;
+        return class_exists('\TSSPlugin\App\Libs\Certificates\RecordOnly') ? \TSSPlugin\App\Libs\Certificates\RecordOnly::guard($function, $params) : null;
     } catch(\Throwable $e) {
         return null;
     }
@@ -41,7 +54,7 @@ function TSSPlugin_recordOnlyGuard($function, $params) {
 
 function TSSPlugin_MetaData() {
     return array(
-        'DisplayName' => class_exists('\ModulesGarden\TSSPlugin\App\Libs\Edition', false) ? \ModulesGarden\TSSPlugin\App\Libs\Edition::name() : 'GoGetSSL Module',
+        'DisplayName' => class_exists('\TSSPlugin\App\Libs\Support\Edition', false) ? \TSSPlugin\App\Libs\Support\Edition::name() : 'GoGetSSL Module',
         'APIVersion' => '1.0',
     );
 }
@@ -151,7 +164,7 @@ function TSSPlugin_AdminServicesTabFields(array $params) {
 
 function TSSPlugin_AdminServicesTabFieldsSave(array $params) {
     if(($recordOnly = TSSPlugin_recordOnlyGuard('AdminServicesTabFieldsSave', $params)) !== null) return $recordOnly;
-    (new \ModulesGarden\Servers\TSSPlugin\app\services\AdminServicesTabFields())->save($params);
+    (new \TSSPlugin\Server\app\services\AdminServicesTabFields())->save($params);
 }
 
 function TSSPlugin_SSLAdminGetCertificate($params) {

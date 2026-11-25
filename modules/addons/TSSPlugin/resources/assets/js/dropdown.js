@@ -1,0 +1,408 @@
+/*
+ * Dropdowns of the module's forms. Every <select class="mod-input"> of a page on the new kernel is shown as
+ * the module's own dropdown (classes mod-select-*), with a search: type to
+ * narrow the list. The <select> stays in the page, hidden, and keeps the value - forms, htmx and Alpine work with
+ * it as with any select (a choice fires its "change" event).
+ *
+ * Nothing to do in a template: write a normal <select class="mod-input">.
+ *   data-native          keeps the browser's own select
+ *   multiple             the chosen values are tags; data-create lets a new value be typed
+ * Keys: arrows move, Enter chooses, Escape closes.
+ */
+(function () {
+    'use strict';
+
+    var SELECTOR = '#mod-root select.mod-input:not(.mod-select-done):not([multiple]):not([data-native])';
+    var MULTI = '#mod-root select.mod-input[multiple]:not(.mod-select-done):not([data-native])';
+    var openOne = null;
+
+    function element(tag, className) {
+        var node = document.createElement(tag);
+        node.className = className;
+        return node;
+    }
+
+    function enhance(select) {
+        select.classList.add('mod-select-done');
+        select.style.display = 'none';
+        select.tabIndex = -1;
+
+        var control = element('div', 'mod-select single');
+        var box = element('div', 'mod-select-box mod-input items has-options');
+        var item = element('div', 'item');
+        var search = element('input', '');
+        search.type = 'text';
+        search.autocomplete = 'off';
+        search.style.width = '4px';
+        var dropdown = element('div', 'mod-select-list single mod-input');
+        dropdown.style.display = 'none';
+        var list = element('div', 'mod-select-options');
+        dropdown.appendChild(list);
+        box.appendChild(item);
+        box.appendChild(search);
+        control.appendChild(box);
+        control.appendChild(dropdown);
+        select.parentNode.insertBefore(control, select.nextSibling);
+
+        var active = -1;       // index (in the shown list) of the highlighted option
+        var shown = [];        // the <option> elements the list shows now
+
+        function chosen() {
+            return select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
+        }
+
+        // the closed box: the chosen option's text
+        function render() {
+            var option = chosen();
+            var text = option ? option.textContent : '';
+            item.textContent = text;
+            item.style.display = text !== '' && search.value === '' ? '' : 'none';
+            box.classList.toggle('has-items', text !== '');
+            box.classList.toggle('full', text !== '');
+            box.classList.toggle('not-full', text === '');
+            box.classList.toggle('disabled', select.disabled);
+            control.style.pointerEvents = select.disabled ? 'none' : '';
+            search.disabled = select.disabled;
+        }
+
+        // the open list: the options that contain what was typed
+        function fill() {
+            var query = search.value.trim().toLowerCase();
+            list.textContent = '';
+            shown = [];
+            Array.prototype.forEach.call(select.options, function (option) {
+                // an option without a text is the "nothing chosen yet" placeholder: it is not offered
+                if (option.disabled || option.textContent === '' || (query !== '' && option.textContent.toLowerCase().indexOf(query) === -1)) {
+                    return;
+                }
+                var row = element('div', 'option' + (option.selected ? ' selected' : ''));
+                row.setAttribute('data-selectable', '');
+                row.textContent = option.textContent;
+                list.appendChild(row);
+                shown.push(option);
+            });
+            active = Math.max(0, shown.indexOf(chosen()));
+            highlight();
+        }
+
+        function highlight() {
+            Array.prototype.forEach.call(list.children, function (row, index) {
+                row.classList.toggle('active', index === active);
+            });
+            if (list.children[active] && list.children[active].scrollIntoView) {
+                list.children[active].scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        function isOpen() {
+            return dropdown.style.display !== 'none';
+        }
+
+        function open() {
+            if (select.disabled || isOpen()) {
+                return;
+            }
+            if (openOne) {
+                openOne();
+            }
+            openOne = close;
+            fill();
+            dropdown.style.display = 'block';
+            dropdown.style.visibility = 'visible';
+            dropdown.style.width = box.offsetWidth + 'px';
+            dropdown.style.top = box.offsetHeight + 'px';
+            dropdown.style.left = '0px';
+            box.classList.add('focus', 'input-active', 'dropdown-active');
+            search.style.opacity = '1';
+        }
+
+        function close() {
+            if (openOne === close) {
+                openOne = null;
+            }
+            dropdown.style.display = 'none';
+            box.classList.remove('focus', 'input-active', 'dropdown-active');
+            search.value = '';
+            search.style.width = '4px';
+            render();
+        }
+
+        function choose(option) {
+            if (option && select.value !== option.value) {
+                select.value = option.value;
+                select.dispatchEvent(new Event('input', { bubbles: true }));
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            close();
+        }
+
+        box.addEventListener('mousedown', function (event) {
+            event.preventDefault();
+            if (isOpen()) {
+                close();
+            } else {
+                open();
+                search.focus();
+            }
+        });
+        search.addEventListener('focus', open);
+        search.addEventListener('input', function () {
+            search.style.width = (search.value.length + 1) + 'ch';
+            item.style.display = search.value === '' && item.textContent !== '' ? '' : 'none';
+            if (!isOpen()) {
+                open();
+            } else {
+                fill();
+            }
+        });
+        search.addEventListener('keydown', function (event) {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (!isOpen()) {
+                    open();
+                    return;
+                }
+                active = Math.min(shown.length - 1, Math.max(0, active + (event.key === 'ArrowDown' ? 1 : -1)));
+                highlight();
+            } else if (event.key === 'Enter') {
+                if (isOpen()) {
+                    event.preventDefault();
+                    choose(shown[active]);
+                }
+            } else if (event.key === 'Escape' || event.key === 'Tab') {
+                if (isOpen()) {
+                    close();
+                }
+            }
+        });
+        list.addEventListener('mousedown', function (event) {
+            event.preventDefault();
+            var row = event.target.closest('.option');
+            if (row) {
+                choose(shown[Array.prototype.indexOf.call(list.children, row)]);
+            }
+        });
+        list.addEventListener('mousemove', function (event) {
+            var row = event.target.closest('.option');
+            if (row) {
+                active = Array.prototype.indexOf.call(list.children, row);
+                highlight();
+            }
+        });
+        // the select changed from outside: another script chose a value, Alpine switched it off, options were replaced
+        select.addEventListener('change', render);
+        new MutationObserver(function () {
+            render();
+            if (isOpen()) {
+                fill();
+            }
+        }).observe(select, { attributes: true, attributeFilter: ['disabled'], childList: true, subtree: true });
+
+        // a required select without a value: the browser cannot point at a hidden field, so the dropdown opens
+        select.addEventListener('invalid', function (event) {
+            event.preventDefault();
+            box.classList.add('mod-is-error');
+            // several can be missing at once: all are marked, the first one opens
+            if (!openOne) {
+                open();
+                search.focus();
+            }
+        });
+        select.addEventListener('change', function () {
+            box.classList.remove('mod-is-error');
+        });
+
+        render();
+    }
+
+    /*
+     * A <select multiple class="mod-input">: the chosen values are shown as tags with an "x", the list offers
+     * the others; with data-create a value that is not in the list can be typed and added with Enter.
+     * Backspace in the empty field removes the last tag.
+     */
+    function enhanceMulti(select) {
+        select.classList.add('mod-select-done');
+        select.style.display = 'none';
+        select.tabIndex = -1;
+
+        var control = element('div', 'mod-select mod-select--tags multi plugin-remove_button');
+        var box = element('div', 'mod-select-box mod-input items not-full has-options');
+        var search = element('input', '');
+        search.type = 'text';
+        search.autocomplete = 'off';
+        search.placeholder = select.getAttribute('data-placeholder') || '';
+        var dropdown = element('div', 'mod-select-list multi mod-input');
+        dropdown.style.display = 'none';
+        var list = element('div', 'mod-select-options');
+        dropdown.appendChild(list);
+        box.appendChild(search);
+        control.appendChild(box);
+        control.appendChild(dropdown);
+        select.parentNode.insertBefore(control, select.nextSibling);
+
+        var shown = [];
+        var active = 0;
+
+        function changed() {
+            select.dispatchEvent(new Event('input', { bubbles: true }));
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        function render() {
+            Array.prototype.slice.call(box.querySelectorAll('.item')).forEach(function (tag) { tag.remove(); });
+            var any = false;
+            Array.prototype.forEach.call(select.options, function (option) {
+                if (!option.selected) {
+                    return;
+                }
+                any = true;
+                var tag = element('div', 'item');
+                tag.setAttribute('data-value', option.value);
+                tag.textContent = option.textContent;
+                var remove = element('a', 'remove');
+                remove.href = '#';
+                remove.tabIndex = -1;
+                remove.textContent = '×';
+                remove.addEventListener('mousedown', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    option.selected = false;
+                    render();
+                    changed();
+                });
+                tag.appendChild(remove);
+                box.insertBefore(tag, search);
+            });
+            box.classList.toggle('has-items', any);
+            search.placeholder = any ? '' : (select.getAttribute('data-placeholder') || '');
+            // with nothing chosen the field shows its placeholder in full
+            search.style.width = any ? Math.max(4, (search.value.length + 1) * 8) + 'px' : '100%';
+        }
+
+        function fill() {
+            var query = search.value.trim().toLowerCase();
+            list.textContent = '';
+            shown = [];
+            Array.prototype.forEach.call(select.options, function (option) {
+                if (option.selected || option.textContent === '' || (query !== '' && option.textContent.toLowerCase().indexOf(query) === -1)) {
+                    return;
+                }
+                var row = element('div', 'option');
+                row.setAttribute('data-selectable', '');
+                row.textContent = option.textContent;
+                list.appendChild(row);
+                shown.push(option);
+            });
+            active = 0;
+            highlight();
+            dropdown.style.display = shown.length ? 'block' : 'none';
+        }
+
+        function highlight() {
+            Array.prototype.forEach.call(list.children, function (row, index) {
+                row.classList.toggle('active', index === active);
+            });
+        }
+
+        function open() {
+            if (openOne && openOne !== close) {
+                openOne();
+            }
+            openOne = close;
+            dropdown.style.visibility = 'visible';
+            dropdown.style.width = box.offsetWidth + 'px';
+            dropdown.style.top = box.offsetHeight + 'px';
+            dropdown.style.left = '0px';
+            box.classList.add('focus', 'input-active', 'dropdown-active');
+            fill();
+        }
+
+        function close() {
+            if (openOne === close) {
+                openOne = null;
+            }
+            dropdown.style.display = 'none';
+            box.classList.remove('focus', 'input-active', 'dropdown-active');
+            search.value = '';
+        }
+
+        function add(option) {
+            option.selected = true;
+            search.value = '';
+            render();
+            changed();
+            open();
+        }
+
+        box.addEventListener('mousedown', function (event) {
+            if (event.target !== search) {
+                event.preventDefault();
+            }
+            search.focus();
+            open();
+        });
+        search.addEventListener('focus', open);
+        search.addEventListener('input', function () {
+            search.style.width = Math.max(4, (search.value.length + 1) * 8) + 'px';
+            open();
+        });
+        search.addEventListener('keydown', function (event) {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                active = Math.min(shown.length - 1, Math.max(0, active + (event.key === 'ArrowDown' ? 1 : -1)));
+                highlight();
+            } else if (event.key === 'Enter') {
+                event.preventDefault();
+                var typed = search.value.trim();
+                if (shown[active]) {
+                    add(shown[active]);
+                } else if (typed !== '' && select.hasAttribute('data-create')) {
+                    // a value that is not in the list
+                    var option = document.createElement('option');
+                    option.value = typed;
+                    option.textContent = typed;
+                    select.appendChild(option);
+                    add(option);
+                }
+            } else if (event.key === 'Backspace' && search.value === '') {
+                var chosen = Array.prototype.filter.call(select.options, function (option) { return option.selected; });
+                if (chosen.length) {
+                    chosen[chosen.length - 1].selected = false;
+                    render();
+                    changed();
+                    open();
+                }
+            } else if (event.key === 'Escape' || event.key === 'Tab') {
+                close();
+            }
+        });
+        list.addEventListener('mousedown', function (event) {
+            event.preventDefault();
+            var row = event.target.closest('.option');
+            if (row) {
+                add(shown[Array.prototype.indexOf.call(list.children, row)]);
+            }
+        });
+
+        render();
+    }
+
+    // a click anywhere else closes the open dropdown
+    document.addEventListener('mousedown', function (event) {
+        if (openOne && !(event.target.closest && event.target.closest('.mod-select'))) {
+            openOne();
+        }
+    });
+
+    function enhanceAll() {
+        Array.prototype.forEach.call(document.querySelectorAll(SELECTOR), enhance);
+        Array.prototype.forEach.call(document.querySelectorAll(MULTI), enhanceMulti);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', enhanceAll);
+    } else {
+        enhanceAll();
+    }
+    document.addEventListener('htmx:afterSettle', enhanceAll);
+})();

@@ -1,8 +1,8 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Libs\Update;
+namespace TSSPlugin\App\Libs\Update;
 
-use ModulesGarden\TSSPlugin\App\Libs\Edition;
+use TSSPlugin\App\Libs\Support\Edition;
 
 /**
  * Asks the module, in a separate request through the web server, whether it loads: modules/addons/<folder>/update-health.php.

@@ -1,6 +1,6 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Migration;
+namespace TSSPlugin\App\Migration;
 
 use WHMCS\Database\Capsule;
 

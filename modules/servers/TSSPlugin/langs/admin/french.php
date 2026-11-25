@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Admin area texts of the server module (service tab, module buttons) - see App\Libs\AdminText.
+ * Admin area texts of the server module (service tab, module buttons) - see App\Libs\Support\AdminText.
  * Separate from the client area language files in the folder above. Own changes go into
  * langs/admin/overrides/french.php (same format, only the keys you change); they survive module updates.
  * :name: placeholders are filled in by the module.
@@ -47,6 +47,13 @@ $_LANG['vendor_licence']                = 'Licence fournisseur :id:';
 $_LANG['ordered_at']                    = 'commandé le :date:';
 $_LANG['last_refresh']                  = 'dernière actualisation :date:';
 $_LANG['last_synchronized']             = 'dernière synchronisation :date:';
+$_LANG['incomplete_bought'] = 'acheté, en attente des informations';
+$_LANG['certificate_token'] = 'Jeton du certificat';
+$_LANG['certificate_token_hint'] = 'Complète la commande : le client peut l’utiliser dans cPanel, Plesk et d’autres plugins, ou envoyer les informations sur la page de configuration.';
+$_LANG['certificate_token_unread'] = 'Pas encore lu depuis TheSSLStore, nouvel essai dans l’heure';
+$_LANG['vendor_notice_failed'] = 'Un problème est survenu avec cette commande chez TheSSLStore : elle n’a pas pu être traitée. Contactez l’assistance TheSSLStore pour en vérifier la raison. Le client est invité à contacter votre assistance.';
+$_LANG['vendor_notice_unpaid'] = 'La commande n’est toujours pas payée chez TheSSLStore. Vérifiez le solde de votre compte TheSSLStore ou contactez l’assistance TheSSLStore. Le client est invité à contacter votre assistance.';
+$_LANG['vendor_notice_new_order'] = 'La commande est en cours d’envoi à l’autorité de certification. Elle devrait être acceptée d’ici quelques minutes.';
 $_LANG['ca_status']                     = 'AC : :status:';
 $_LANG['renewal_days_auto']             = 'auto';
 $_LANG['renewal_days_hint']             = '0 à :max: jours reportés sur la commande de renouvellement (Sectigo). Vide = le réglage global ou les jours restants du certificat.';

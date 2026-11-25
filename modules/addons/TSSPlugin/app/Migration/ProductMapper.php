@@ -1,8 +1,8 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Migration;
+namespace TSSPlugin\App\Migration;
 
-use ModulesGarden\TSSPlugin\App\Models\RemoteProduct;
+use TSSPlugin\App\Models\RemoteProduct;
 
 /**
  * Finds the gateway product (the RemoteProducts table, synced in wizard step 4) for a legacy product reference:

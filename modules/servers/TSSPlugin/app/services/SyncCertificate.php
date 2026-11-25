@@ -1,9 +1,9 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\app\services;
+namespace TSSPlugin\Server\app\services;
 
-use ModulesGarden\TSSPlugin\App\Libs\CertificateSyncHelpers;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
+use TSSPlugin\App\Libs\Certificates\CertificateSyncHelpers;
+use TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
 
 /**
  * Admin "Sync Certificate" button - the SSLCertificates cron flow for a single service,
@@ -13,7 +13,7 @@ class SyncCertificate
 {
     public function run($params)
     {
-        $gatewayType = \ModulesGarden\TSSPlugin\App\Libs\GatewayOrderService::typeOfService($params['serviceid']);
+        $gatewayType = \TSSPlugin\App\Libs\ProductLines\GatewayOrderService::typeOfService($params['serviceid']);
         if($gatewayType)
         {
             $gatewayType::refresh($params['serviceid']);

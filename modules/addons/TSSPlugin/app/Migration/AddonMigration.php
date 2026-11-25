@@ -1,11 +1,10 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Migration;
+namespace TSSPlugin\App\Migration;
 
-use ModulesGarden\TSSPlugin\App\Libs\AddonCertificates;
-use ModulesGarden\TSSPlugin\App\Libs\ProductAddons;
-use ModulesGarden\TSSPlugin\App\Migration\Readers\LegacyReaderInterface;
-use ModulesGarden\TSSPlugin\App\Models\Request;
+use TSSPlugin\App\Libs\Certificates\AddonCertificates;
+use TSSPlugin\App\Libs\Products\ProductAddons;
+use TSSPlugin\App\Models\Request;
 use WHMCS\Database\Capsule;
 
 /**

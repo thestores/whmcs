@@ -1,8 +1,8 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\core;
+namespace TSSPlugin\Server\core;
 
-use ModulesGarden\Servers\TSSPlugin\Server;
+use TSSPlugin\Server\Server;
 
 class Smarty {
     static private $_instance;

@@ -1,46 +1,15 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\app\controllers\server\clientarea\parts;
+namespace TSSPlugin\Server\app\controllers\server\clientarea\parts;
 
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Client;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Order;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Product;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Service;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\SSL;
-use ModulesGarden\Servers\TSSPlugin\app\repository\whmcs\Config;
-use ModulesGarden\Servers\TSSPlugin\app\repository\whmcs\Domain;
-use ModulesGarden\Servers\TSSPlugin\app\repository\whmcs\ProductConfigOptions;
-use ModulesGarden\Servers\TSSPlugin\app\services\InvoiceRenew;
-use ModulesGarden\Servers\TSSPlugin\app\services\SSLStepThree;
-use ModulesGarden\Servers\TSSPlugin\core\Lang;
-use ModulesGarden\Servers\TSSPlugin\core\process\AbstractController;
-use ModulesGarden\Servers\TSSPlugin\Server;
-use ModulesGarden\TSSPlugin\App\Helpers\EmailTemplates;
-use ModulesGarden\TSSPlugin\App\Libs\AcmeHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\AisHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\AutoInstallHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\CertificateBundle;
-use ModulesGarden\TSSPlugin\App\Libs\CertificateService;
-use ModulesGarden\TSSPlugin\App\Libs\CertificateSyncHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\Cpanel;
-use ModulesGarden\TSSPlugin\App\Libs\GeneralSettings;
-use ModulesGarden\TSSPlugin\App\Libs\ProductSettings;
-use ModulesGarden\TSSPlugin\App\Libs\SmimeService;
-use ModulesGarden\TSSPlugin\App\Libs\CodeSigningService;
-use ModulesGarden\TSSPlugin\App\Libs\SslProductHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\Helpers;
-use ModulesGarden\TSSPlugin\App\Libs\SSLTrustCenterApi;
-use ModulesGarden\TSSPlugin\App\Models\AcmeSubscription;
-use ModulesGarden\TSSPlugin\App\Models\AcmeSubscriptionDomain;
-use ModulesGarden\TSSPlugin\App\Models\AisSubscription;
-use ModulesGarden\TSSPlugin\App\Models\RemoteProduct;
-use ModulesGarden\TSSPlugin\App\Models\Request;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\ProductRepository;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Helper;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Models\Invoice;
-use WHMCS\Billing\Tax;
-use WHMCS\Database\Capsule;
+use TSSPlugin\Server\app\models\whmcs\Client;
+use TSSPlugin\Server\app\models\whmcs\Order;
+use TSSPlugin\Server\app\models\whmcs\Service;
+use TSSPlugin\Server\app\services\InvoiceRenew;
+use TSSPlugin\Server\core\Lang;
+use TSSPlugin\App\Libs\Certificates\CertificateService;
+use TSSPlugin\App\Libs\ProductLines\CodeSigningService;
+use TSSPlugin\App\Models\Whmcs\Invoice;
 
 /**
  * Renewal dialog of S/MIME and code signing certificates.
@@ -60,16 +29,16 @@ trait GatewayRenewalActions
         $vars['renewNeedsModel'] = $type === CodeSigningService::class && CodeSigningService::renewalNeedsTokenModel($stored);
         $vars['renewIsCs']       = $type === CodeSigningService::class;
         // document signing renews onto the token the client already has, so "same details" asks no model
-        $vars['renewIsDs']       = $type === \ModulesGarden\TSSPlugin\App\Libs\DocumentSigningService::class;
+        $vars['renewIsDs']       = $type === \TSSPlugin\App\Libs\ProductLines\DocumentSigningService::class;
         // LEI: "same details" renews with the legal entity data and the signing authority unchanged
-        $vars['renewIsLei']      = $type === \ModulesGarden\TSSPlugin\App\Libs\LeiService::class;
+        $vars['renewIsLei']      = $type === \TSSPlugin\App\Libs\ProductLines\LeiService::class;
         $vars['renewModels']     = CodeSigningService::TOKEN_MODELS;
         $vars['renewAgreement']  = CertificateService::agreement((int)$input['params']['pid']);
         $vars['csrfToken']       = $vars['csrfToken'] ?? \generate_token('plain');
         // Result of the Renew dialog (renewOrderHTML redirects back here)
-        $vars['flashSuccess']    = $_SESSION['mg-success'] ?? '';
-        $vars['flashError']      = $_SESSION['mg-error'] ?? '';
-        unset($_SESSION['mg-success'], $_SESSION['mg-error']);
+        $vars['flashSuccess']    = $_SESSION['mod-success'] ?? '';
+        $vars['flashError']      = $_SESSION['mod-error'] ?? '';
+        unset($_SESSION['mod-success'], $_SESSION['mod-error']);
 
         return $vars;
     }
@@ -86,7 +55,7 @@ trait GatewayRenewalActions
         try
         {
             $this->requireCsrfToken();
-            $type = \ModulesGarden\TSSPlugin\App\Libs\GatewayOrderService::typeOfService($serviceId);
+            $type = \TSSPlugin\App\Libs\ProductLines\GatewayOrderService::typeOfService($serviceId);
             if(!$type || !$type::renewalOpen($serviceId))
             {
                 throw new \Exception(Lang::absoluteT('renewNotAvailable'));
@@ -111,11 +80,11 @@ trait GatewayRenewalActions
             $type::setRenewChoice($serviceId, $same, $extra);
 
             list($invoiceId, $created) = (new InvoiceRenew())->getOrCreateInvoice($serviceId);
-            $_SESSION['mg-success'] = Lang::absoluteT($created ? 'renew_invoice_generated' : 'renew_exists') . ' <a target="_blank" href="' . $CONFIG['SystemURL'] . '/viewinvoice.php?id=' . (int)$invoiceId . '">' . Lang::absoluteT('Click here to view the invoice') . '</a>';
+            $_SESSION['mod-success'] = Lang::absoluteT($created ? 'renew_invoice_generated' : 'renew_exists') . ' <a target="_blank" href="' . $CONFIG['SystemURL'] . '/viewinvoice.php?id=' . (int)$invoiceId . '">' . Lang::absoluteT('Click here to view the invoice') . '</a>';
         }
         catch(\Exception $e)
         {
-            $_SESSION['mg-error'] = $e->getMessage();
+            $_SESSION['mod-error'] = $e->getMessage();
         }
         redir('action=productdetails&id=' . $serviceId, 'clientarea.php');
     }

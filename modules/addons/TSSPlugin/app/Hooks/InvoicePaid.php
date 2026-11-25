@@ -9,10 +9,9 @@ if(!defined('WHMCS'))
 
 
 
-use ModulesGarden\TSSPlugin\App\Helpers\EmailTemplates;
-use ModulesGarden\TSSPlugin\App\Libs\AcmeHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\Helpers;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Models\Service;
+use TSSPlugin\App\Helpers\EmailTemplates;
+use TSSPlugin\App\Libs\Subscriptions\AcmeHelpers;
+use TSSPlugin\App\Models\Whmcs\Service;
 
 $hookManager->register(
     function($args) {
@@ -20,7 +19,7 @@ $hookManager->register(
         try
         {
             // domains bought on the module's invoice ("Buy more domains")
-            \ModulesGarden\TSSPlugin\App\Libs\SubscriptionBilling::applySlotPurchase((int)($args['invoiceid'] ?? 0));
+            \TSSPlugin\App\Libs\Subscriptions\SubscriptionBilling::applySlotPurchase((int)($args['invoiceid'] ?? 0));
 
             $items = \WHMCS\Database\Capsule::table('tblinvoiceitems')
                 ->where('invoiceid', (int)($args['invoiceid'] ?? 0))
@@ -31,10 +30,10 @@ $hookManager->register(
             foreach($items as $item)
             {
                 // the same subscription carries on: its renewal and due date move one year on
-                \ModulesGarden\TSSPlugin\App\Libs\SubscriptionBilling::renewalPaid((int)$item->relid, (int)($args['invoiceid'] ?? 0));
+                \TSSPlugin\App\Libs\Subscriptions\SubscriptionBilling::renewalPaid((int)$item->relid, (int)($args['invoiceid'] ?? 0));
                 $service = Service::find((int)$item->relid);
 
-                if($service && \ModulesGarden\TSSPlugin\App\Libs\SubscriptionBilling::isSubscriptionProduct($service->packageid))
+                if($service && \TSSPlugin\App\Libs\Subscriptions\SubscriptionBilling::isSubscriptionProduct($service->packageid))
                 {
                     EmailTemplates::sendEmail(EmailTemplates::SUBSCRIPTION_RENEWAL_TEMPLATE, $service->id, []);
                 }

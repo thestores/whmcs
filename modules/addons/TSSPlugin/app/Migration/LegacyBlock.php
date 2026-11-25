@@ -1,9 +1,9 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Migration;
+namespace TSSPlugin\App\Migration;
 
-use ModulesGarden\TSSPlugin\App\Libs\Edition;
-use ModulesGarden\TSSPlugin\App\Migration\Support\Schema;
+use TSSPlugin\App\Libs\Support\Edition;
+use TSSPlugin\App\Migration\Support\Schema;
 use WHMCS\Database\Capsule;
 
 /**
@@ -325,7 +325,7 @@ class LegacyBlock
             $legacyTab = false;
             foreach(array_keys($_REQUEST) as $key)
             {
-                $legacyTab = $legacyTab || strpos((string)$key, 'mg-') === 0;
+                $legacyTab = $legacyTab || strpos((string)$key, 'mod-') === 0;
             }
             // module commands (modop) are aborted by the PreModule* hooks, which also hold a paid create / renewal
             $save = !empty($_POST) && !isset($_REQUEST['modop']);
@@ -340,7 +340,7 @@ class LegacyBlock
 
         if($name === 'addonmodules.php' && self::run() && strcasecmp((string)($_GET['module'] ?? ''), self::$state['addon']) === 0)
         {
-            self::stop(self::text('paused_script'), null, 'addonmodules.php?module=' . Writer::MODULE . '&mg-page=migration');
+            self::stop(self::text('paused_script'), null, 'addonmodules.php?module=' . Writer::MODULE . '&mod-page=migration');
         }
     }
 
@@ -422,10 +422,10 @@ class LegacyBlock
         $text = '';
         try
         {
-            if(class_exists('\ModulesGarden\Servers\TSSPlugin\core\Lang'))
+            if(class_exists('\TSSPlugin\Server\core\Lang'))
             {
                 // absoluteT returns HTML entities; the callers escape for themselves
-                $text = html_entity_decode((string)\ModulesGarden\Servers\TSSPlugin\core\Lang::absoluteT('migrationPause', $key), ENT_QUOTES, 'UTF-8');
+                $text = html_entity_decode((string)\TSSPlugin\Server\core\Lang::absoluteT('migrationPause', $key), ENT_QUOTES, 'UTF-8');
             }
         }
         catch(\Throwable $e)

@@ -1,6 +1,6 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Libs\Update;
+namespace TSSPlugin\App\Libs\Update;
 
 /**
  * Replaces the two module folders (modules/addons/<folder>, modules/servers/<folder>) by renames, never by copying,

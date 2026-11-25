@@ -1,8 +1,8 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\app\models\whmcs;
+namespace TSSPlugin\Server\app\models\whmcs;
 
-use \Illuminate\Database\Eloquent\model as EloquentModel;
+use Illuminate\Database\Eloquent\Model as EloquentModel;
 
 class SSL extends EloquentModel
 {

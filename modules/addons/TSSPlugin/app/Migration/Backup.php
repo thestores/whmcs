@@ -1,10 +1,10 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Migration;
+namespace TSSPlugin\App\Migration;
 
-use ModulesGarden\TSSPlugin\App\Libs\Edition;
+use TSSPlugin\App\Libs\Support\Edition;
 
-use ModulesGarden\TSSPlugin\App\Migration\Support\Schema;
+use TSSPlugin\App\Migration\Support\Schema;
 use WHMCS\Database\Capsule;
 
 /**

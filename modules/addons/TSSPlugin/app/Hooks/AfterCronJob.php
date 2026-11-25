@@ -8,7 +8,7 @@ if(!defined('WHMCS'))
 }
 
 
-use ModulesGarden\TSSPlugin\App\Libs\CronLauncher;
+use TSSPlugin\App\Libs\Support\CronLauncher;
 
 // WHMCS's system cron starts the module's jobs when the module's own cron entry is not in use (see CronLauncher)
 $hookManager->register(

@@ -1,18 +1,18 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\core\process;
+namespace TSSPlugin\Server\core\process;
 
-use ModulesGarden\Servers\TSSPlugin\core\Lang;
-use ModulesGarden\Servers\TSSPlugin\core\Smarty;
+use TSSPlugin\Server\core\Lang;
+use TSSPlugin\Server\core\Smarty;
 
 abstract class AbstractController {
-    public $mgToken = null;
+    public $modToken = null;
     private $registredValidationErros = [];
 
     function __construct($input = null) {
-        if(isset($input['mg-token']))
+        if(isset($input['mod-token']))
         {
-            $this->mgToken = $input['mg-token'];
+            $this->modToken = $input['mod-token'];
         }
     }
 
@@ -23,15 +23,15 @@ abstract class AbstractController {
     function checkToken($token = null){
         if($token === null)
         {
-            $token = $this->mgToken;
+            $token = $this->modToken;
         }
 
-        if($_SESSION['mg-token'] === $token)
+        if($_SESSION['mod-token'] === $token)
         {
             return false;
         }
 
-        $_SESSION['mg-token'] = $token;
+        $_SESSION['mod-token'] = $token;
 
         return true;
     }

@@ -1,10 +1,10 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Migration\Readers;
+namespace TSSPlugin\App\Migration\Readers;
 
-use ModulesGarden\TSSPlugin\App\Migration\ProductMapper;
-use ModulesGarden\TSSPlugin\App\Migration\Support\Configdata;
-use ModulesGarden\TSSPlugin\App\Migration\Support\Schema;
+use TSSPlugin\App\Migration\ProductMapper;
+use TSSPlugin\App\Migration\Support\Configdata;
+use TSSPlugin\App\Migration\Support\Schema;
 use WHMCS\Database\Capsule;
 
 /**
@@ -127,7 +127,7 @@ class GgsReader extends AbstractReader
         // its renewal invoice was created L days before a due date that lay D days before the order end (D only with
         // the subscription invoice switch on). The 1.5.0 pair keeps the due date where it was: the invoice is
         // created D + L days before the end (at most 30), due D days before it.
-        $maxLead  = \ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::MAX_LEAD;
+        $maxLead  = \TSSPlugin\App\Libs\Billing\RenewalPolicy::MAX_LEAD;
         $prior    = !empty($s['auto_renew_invoice_subscription']) ? max(0, (int)$val('renew_invoice_days_subscription', '0')) : 0;
         $lead     = min($maxLead, max(1, $prior + max(0, (int)$val('renew_invoice_days_reccuring', '30'))));
         // subscriptions: the same lead; due early enough that an unpaid renewal is cancelled before the vendor renews
@@ -143,11 +143,10 @@ class GgsReader extends AbstractReader
             'oneTimeSendExpirationNotifications'                 => $on('send_expiration_notification_one_time') ? '30,15,7,3,1' : '',
             'recurringCreateAutomaticRenewalInvoiceSubscription' => $on('auto_renew_invoice_subscription'),
             'recurringDaysBeforeExpirySubscription'              => (string)$leadSub,
-            'recurringPaymentTermSubscription'                   => (string)min(\ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::DEFAULT_TERM, \ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::safeTerm(\ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::SUBSCRIPTION, $leadSub)),
+            'recurringPaymentTermSubscription'                   => (string)min(\TSSPlugin\App\Libs\Billing\RenewalPolicy::DEFAULT_TERM, \TSSPlugin\App\Libs\Billing\RenewalPolicy::safeTerm(\TSSPlugin\App\Libs\Billing\RenewalPolicy::SUBSCRIPTION, $leadSub)),
             'recurringSendExpirationNotificationsSubscription'   => $on('send_expiration_notification_subscription') ? '30,15,7,3,1' : '',
             'renewOrderViaExistingOrder'                         => empty($s['renew_new_order']) ? 'on' : '',
             'automaticProcessingOfRenewalOrders'                 => $on('automatic_processing_of_renewal_orders'),
-            'setTheUnpaidStatusForRenewalInvoices'               => $on('renewal_invoice_status_unpaid'),
             'visibleRenewButtonBeforeExpiration'                 => $on('visible_renew_button'),
             'visibleRenewButtonAfterExpiration'                  => $on('visible_renew_button'),
             'enableCsrGenerator'                                 => $on('display_csr_generator'),

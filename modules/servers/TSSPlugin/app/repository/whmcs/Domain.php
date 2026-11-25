@@ -1,9 +1,8 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\app\repository\whmcs;
+namespace TSSPlugin\Server\app\repository\whmcs;
 
-use WHMCS\Database\Capsule as DataBase;
-use ModulesGarden\Servers\TSSPlugin\core\Lang;
+use TSSPlugin\Server\core\Lang;
 
 class Domain {
 

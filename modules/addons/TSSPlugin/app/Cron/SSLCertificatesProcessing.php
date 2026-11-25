@@ -1,220 +1,32 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Cron;
+namespace TSSPlugin\App\Cron;
 
-use ModulesGarden\TSSPlugin\App\Libs\Edition;
-
-use Exception;
-use ModulesGarden\TSSPlugin\App\Helpers\EmailTemplates;
-use ModulesGarden\TSSPlugin\App\Libs\AcmeHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\AutoInstallHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\CertificateService;
-use ModulesGarden\TSSPlugin\App\Libs\SSLTrustCenterApi;
-use ModulesGarden\TSSPlugin\App\Libs\SslProductHelpers;
-use ModulesGarden\TSSPlugin\App\Models\AcmeSubscription;
-use ModulesGarden\TSSPlugin\App\Models\CronCheck;
-use ModulesGarden\TSSPlugin\App\Models\Request;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
-use ModulesGarden\TSSPlugin\Core\CommandLine\AbstractCommand;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Models\Service;
-use ModulesGarden\TSSPlugin\Packages\Logs\Support\Facades\Logger;
+use TSSPlugin\App\Kernel\Console\Command;
+use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use WHMCS\Database\Capsule;
 
 /**
- * Class Sample
- * @package ModulesGarden\TSSPlugin\App\Cron
+ * Retired: the pending orders were read one by one every 5 minutes. The order status sync (SSLCertificates,
+ * GET /services/updates every 5 minutes) now reads only the orders the vendor reports as changed. Kept so an old
+ * cron line "cron.php SSLCertificatesProcessing" still works: it starts the order status sync, which runs when due.
  */
-class SSLCertificatesProcessing extends AbstractCommand
+class SSLCertificatesProcessing extends Command
 {
-    /**
-     * Command name
-     * @var string
-     */
     protected $name = 'SSLCertificatesProcessing';
 
-    /**
-     * Command description
-     * @var string
-     */
-    protected $description = 'SSL Certificates Processing sync.';
+    protected $description = 'Retired: starts the order status sync (SSLCertificates)';
 
-    /**
-     * Command help text
-     * @var string
-     */
     protected $help = '';
 
-    /**
-     * Configure command
-     */
     protected function setup()
     {
     }
 
-    /**
-     * Run your custom code
-     * @param InputInterface $input
-     * @param OutputInterface $output
-     * @return int|null|void
-     */
     protected function process(InputInterface $input, OutputInterface $output, SymfonyStyle $io)
     {
-        $checkCron = (new AddonModuleRepository())->checkCron('cron5');
-        if($checkCron === false)
-        {
-            return;
-        }
-
-        $addonConfig = (new AddonModuleRepository())->getModuleConfiguration();
-
-        $errorToDB = '';
-        $requests  = Edition::table('Requests');
-
-        $certificatesQuery = Service::select(['tblhosting.*','tblsslorders.remoteid','tblproducts.configoption1','tblproducts.configoption9'])
-            ->join('tblsslorders', 'tblsslorders.serviceid', '=', 'tblhosting.id')
-            ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
-            ->join($requests, $requests . '.serviceid', '=', 'tblhosting.id')
-            // a new order is stored as "processing" until the gateway reports it (GoGetSSL adds the validation details
-            // a few seconds after the order is placed) - without it such orders were never re-read
-            ->whereIn($requests . '.status', ['pending', 'processing'])
-            ->where('tblproducts.servertype', 'TSSPlugin')
-            ->where('tblhosting.domainstatus', 'Active')
-            ->where('tblsslorders.status', 'Configuration Submitted')
-            // S/MIME and code signing orders keep their own request rows (also pending): GatewayOrderService refreshes them
-            ->where(function($query) {
-                $query->whereNull('tblproducts.configoption9')->orWhereNotIn('tblproducts.configoption9', array_merge(\ModulesGarden\TSSPlugin\App\Libs\GatewayOrderService::categories(), \ModulesGarden\TSSPlugin\App\Libs\SSLTrustCenterApi::SUBSCRIPTION_CATEGORIES));
-            })
-            ->groupBy('tblhosting.id');
-        \ModulesGarden\TSSPlugin\App\Libs\RecordOnly::exclude($certificatesQuery);
-
-        $output->write('Start checking certificates...') .
-
-        $io->title('Progress Bar!');
-        $io->progressStart($certificatesQuery->count());
-
-        $failed = [];
-        $totalChecked = $certificatesQuery->get()->count();
-        foreach ($certificatesQuery->get()->toArray() as $certificate) {
-
-            $io->progressAdvance(1);
-
-            try {
-
-                $api = SSLTrustCenterApi::forVendor($certificate['configoption1'], $certificate['configoption9']);
-                $orderData = $api->getOrder($certificate['remoteid'], $certificate['id']);
-
-                $orderFiles = [];
-                if($orderData['order']['status'] == 'active')
-                {
-                    try {
-                        $orderFiles = $api->getCertificateFiles($certificate['remoteid']);
-                    } catch (Exception $exception) {
-                        Logger::error('Get Certificate Files Error:'.$exception->getMessage(), \ModulesGarden\TSSPlugin\App\Libs\LogContext::exception($exception, ['service' => $certificate['id']]));
-                    }
-                }
-
-                Request::where('serviceid', $certificate['id'])->where('name', 'addOrder')->update([
-                    'status' => $orderData['order']['status']
-                ]);
-
-                $request = ['orderData' => $orderData, 'orderFiles' => $orderFiles];
-
-                $previousStatus = Request::where('serviceid', $certificate['id'])->where('name', 'certificate')->value('status');
-                Request::where('serviceid', $certificate['id'])->where('name', 'certificate')->delete();
-                Request::insert([
-                    'serviceid' => $certificate['id'],
-                    'name' => 'certificate',
-                    'request' => \encrypt(json_encode($request)),
-                    'status' => $orderData['order']['status'],
-                    'created_at' => date('Y-m-d H:i:s'),
-                    'updated_at' => date('Y-m-d H:i:s')
-                ]);
-
-                if($orderData['order']['status'] == 'active')
-                {
-                    // the order end (never the certificate end) - certificates within the order are reissued
-                    $nextDueDate = SslProductHelpers::getServiceDueDate($orderData, $orderFiles);
-                    if($nextDueDate)
-                    {
-                        Service::where('id', $certificate['id'])->update([
-                            'nextinvoicedate' => $nextDueDate,
-                            'nextduedate' => $nextDueDate,
-                        ]);
-                        \ModulesGarden\TSSPlugin\App\Libs\AddonCertificates::followDueDate((int)$certificate['id'], (string)$nextDueDate);
-                    }
-                }
-
-                // certificate e-mail - the same rule for every sync (CertificateService::notifyIssued)
-                CertificateService::notifyIssued($certificate['id'], $previousStatus, $orderData['order']['status']);
-                if($orderData['order']['status'] === 'active')
-                {
-                    CertificateService::forgetPreviousCertificate($certificate['id']);
-                }
-
-                // same rule as the order status sync (CertificateSyncHelpers): App\Libs\CertificateEnd
-                \ModulesGarden\TSSPlugin\App\Libs\CertificateEnd::apply((int)$certificate['id'], (string)$previousStatus, (string)$orderData['order']['status']);
-
-                if($previousStatus !== $orderData['order']['status'])
-                {
-                    Logger::info('Certificate status: ' . ($previousStatus ?: 'new') . ' -> ' . $orderData['order']['status'], ['service' => $certificate['id'], 'from' => $previousStatus, 'to' => $orderData['order']['status']]);
-                }
-
-            } catch (Exception $e) {
-
-                $failed[$certificate['id']] = $e->getMessage();
-                $io->write('Error: ' . $e->getMessage());
-
-                Logger::error($e->getMessage(), \ModulesGarden\TSSPlugin\App\Libs\LogContext::exception($e, ['service' => $certificate['id']]));
-
-                continue;
-
-            }
-        }
-
-        $io->progressFinish();
-        // one line with the number of failed orders and which, not the message of the last one
-        if($failed)
-        {
-            $errorToDB = \ModulesGarden\TSSPlugin\App\Libs\CronErrors::summary($failed, $totalChecked);
-        }
-        $io->title('Subscriptions');
-        $pendingSubscriptions = AcmeSubscription::where('status', 'pending')->get();
-        $io->progressStart($pendingSubscriptions->count());
-
-        foreach($pendingSubscriptions as $subscription)
-        {
-            try
-            {
-                $io->progressAdvance(1);
-                AcmeHelpers::refreshAcmeCertificateDetails($subscription->service_id);
-            }
-            catch(\Throwable $e)
-            {
-                $errorToDB = $e->getMessage();
-            }
-        }
-
-        $io->progressFinish();
-        // (the AutoInstall queue has its own job, SSLAutoInstall: it was run from here as well)
-
-        // legacy migration housekeeping: expired backup tables, log rows older than 30 days
-        try
-        {
-            \ModulesGarden\TSSPlugin\App\Migration\Engine::housekeeping();
-        }
-        catch(\Throwable $e)
-        {
-            $errorToDB = $errorToDB ?: $e->getMessage();
-        }
-
-        CronCheck::updateOrCreate(
-            ['type' => 'SSLCertificatesProcessing'],
-            ['last_run' => date('Y-m-d H:i:s'), 'last_error' => $errorToDB]
-        );
-
-        $io->success('Finished!');
+        $this->getApplication()->find('SSLCertificates')->run(new ArrayInput(['command' => 'SSLCertificates'] + ($input->getOption('force') ? ['--force' => true] : [])), $output);
     }
 }

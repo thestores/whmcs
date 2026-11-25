@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Admin area texts of the server module (service tab, module buttons) - see App\Libs\AdminText.
+ * Admin area texts of the server module (service tab, module buttons) - see App\Libs\Support\AdminText.
  * Separate from the client area language files in the folder above. Own changes go into
  * langs/admin/overrides/czech.php (same format, only the keys you change); they survive module updates.
  * :name: placeholders are filled in by the module.
@@ -47,6 +47,13 @@ $_LANG['vendor_licence']                = 'Licence dodavatele :id:';
 $_LANG['ordered_at']                    = 'objednáno :date:';
 $_LANG['last_refresh']                  = 'poslední aktualizace :date:';
 $_LANG['last_synchronized']             = 'naposledy synchronizováno :date:';
+$_LANG['incomplete_bought'] = 'zakoupeno, čeká na údaje';
+$_LANG['certificate_token'] = 'Token certifikátu';
+$_LANG['certificate_token_hint'] = 'Dokončuje objednávku: klient jej může použít v cPanelu, Plesku a dalších pluginech nebo odeslat údaje na stránce konfigurace.';
+$_LANG['certificate_token_unread'] = 'Zatím nenačteno z TheSSLStore, nový pokus do hodiny';
+$_LANG['vendor_notice_failed'] = 'S touto objednávkou u TheSSLStore je něco v nepořádku: nepodařilo se ji zpracovat. Kontaktujte podporu TheSSLStore a zjistěte příčinu. Klient je vyzván, aby kontaktoval vaši podporu.';
+$_LANG['vendor_notice_unpaid'] = 'Objednávka u TheSSLStore stále není zaplacena. Zkontrolujte zůstatek svého účtu TheSSLStore nebo kontaktujte podporu TheSSLStore. Klient je vyzván, aby kontaktoval vaši podporu.';
+$_LANG['vendor_notice_new_order'] = 'Objednávka se odesílá certifikační autoritě. Měla by být přijata během několika minut.';
 $_LANG['ca_status']                     = 'CA: :status:';
 $_LANG['renewal_days_auto']             = 'auto';
 $_LANG['renewal_days_hint']             = '0–:max: dní převedených do objednávky obnovy (Sectigo). Prázdné = globální nastavení nebo zbývající dny certifikátu.';

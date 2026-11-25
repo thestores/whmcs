@@ -1,11 +1,11 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\app\controllers\server\clientarea\parts;
+namespace TSSPlugin\Server\app\controllers\server\clientarea\parts;
 
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\SSL;
-use ModulesGarden\Servers\TSSPlugin\core\Lang;
-use ModulesGarden\TSSPlugin\App\Libs\CertificateService;
-use ModulesGarden\TSSPlugin\App\Libs\PciService;
+use TSSPlugin\Server\app\models\whmcs\SSL;
+use TSSPlugin\Server\core\Lang;
+use TSSPlugin\App\Libs\Certificates\CertificateService;
+use TSSPlugin\App\Libs\ProductLines\PciService;
 use WHMCS\Database\Capsule;
 
 /**
@@ -17,7 +17,7 @@ trait PciActions
     /**
      * Service page: the order form while the service waits for configuration, else the scan account
      */
-    private function indexPciHTML($input, $vars = array())
+    private function indexPciHTML($input, $vars = [])
     {
         $serviceId = (int)$input['params']['serviceid'];
         $ssl       = SSL::getByServiceId($serviceId);
@@ -107,7 +107,7 @@ trait PciActions
         return ['tpl' => 'home_pci_configuration', 'vars' => $vars];
     }
 
-    public function createPciJSON($input, $vars = array())
+    public function createPciJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
         $serviceId = (int)$input['params']['serviceid'];
@@ -164,7 +164,7 @@ trait PciActions
         return ['success' => true, 'message' => $this->pciText('pciOrderedSuccessfully', 'Your scan account has been created.')];
     }
 
-    public function refreshPciDetailsJSON($input, $vars = array())
+    public function refreshPciDetailsJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
         $serviceId = (int)$input['params']['serviceid'];

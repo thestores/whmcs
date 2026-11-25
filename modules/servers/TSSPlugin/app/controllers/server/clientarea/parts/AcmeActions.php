@@ -1,45 +1,22 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\app\controllers\server\clientarea\parts;
+namespace TSSPlugin\Server\app\controllers\server\clientarea\parts;
 
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Client;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Order;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Product;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Service;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\SSL;
-use ModulesGarden\Servers\TSSPlugin\app\repository\whmcs\Config;
-use ModulesGarden\Servers\TSSPlugin\app\repository\whmcs\Domain;
-use ModulesGarden\Servers\TSSPlugin\app\repository\whmcs\ProductConfigOptions;
-use ModulesGarden\Servers\TSSPlugin\app\services\InvoiceRenew;
-use ModulesGarden\Servers\TSSPlugin\app\services\SSLStepThree;
-use ModulesGarden\Servers\TSSPlugin\core\Lang;
-use ModulesGarden\Servers\TSSPlugin\core\process\AbstractController;
-use ModulesGarden\Servers\TSSPlugin\Server;
-use ModulesGarden\TSSPlugin\App\Helpers\EmailTemplates;
-use ModulesGarden\TSSPlugin\App\Libs\AcmeHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\AisHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\AutoInstallHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\CertificateBundle;
-use ModulesGarden\TSSPlugin\App\Libs\CertificateService;
-use ModulesGarden\TSSPlugin\App\Libs\CertificateSyncHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\Cpanel;
-use ModulesGarden\TSSPlugin\App\Libs\GeneralSettings;
-use ModulesGarden\TSSPlugin\App\Libs\ProductSettings;
-use ModulesGarden\TSSPlugin\App\Libs\SmimeService;
-use ModulesGarden\TSSPlugin\App\Libs\CodeSigningService;
-use ModulesGarden\TSSPlugin\App\Libs\SslProductHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\Helpers;
-use ModulesGarden\TSSPlugin\App\Libs\SSLTrustCenterApi;
-use ModulesGarden\TSSPlugin\App\Models\AcmeSubscription;
-use ModulesGarden\TSSPlugin\App\Models\AcmeSubscriptionDomain;
-use ModulesGarden\TSSPlugin\App\Models\AisSubscription;
-use ModulesGarden\TSSPlugin\App\Models\RemoteProduct;
-use ModulesGarden\TSSPlugin\App\Models\Request;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\ProductRepository;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Helper;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Models\Invoice;
-use WHMCS\Billing\Tax;
+use TSSPlugin\Server\app\models\whmcs\Client;
+use TSSPlugin\Server\app\models\whmcs\Order;
+use TSSPlugin\Server\app\models\whmcs\Product;
+use TSSPlugin\Server\app\models\whmcs\Service;
+use TSSPlugin\Server\app\models\whmcs\SSL;
+use TSSPlugin\Server\app\repository\whmcs\Domain;
+use TSSPlugin\Server\app\repository\whmcs\ProductConfigOptions;
+use TSSPlugin\Server\core\Lang;
+use TSSPlugin\Server\Server;
+use TSSPlugin\App\Libs\Subscriptions\AcmeHelpers;
+use TSSPlugin\App\Libs\Certificates\CertificateService;
+use TSSPlugin\App\Libs\Support\Helpers;
+use TSSPlugin\App\Models\AcmeSubscription;
+use TSSPlugin\App\Models\AcmeSubscriptionDomain;
+use TSSPlugin\App\Models\Whmcs\Invoice;
 use WHMCS\Database\Capsule;
 
 /**
@@ -125,13 +102,12 @@ trait AcmeActions
         ];
     }
 
-    private function indexAcmeHTML($input, $vars = array())
+    private function indexAcmeHTML($input, $vars = [])
     {
         $serviceId    = (int)$input['params']['serviceid'];
         $userId       = (int)$input['params']['userid'];
         $sslService   = SSL::getByServiceId($serviceId);
         $product      = Product::find((int)$input['params']['pid']);
-        \ModulesGarden\TSSPlugin\App\Libs\SubscriptionState::ensureColumns();
         $subscription = AcmeSubscription::where('service_id', $serviceId)->first();
 
         // not active yet, or its ACME account not active yet (the keys work only then): read the current state
@@ -153,7 +129,7 @@ trait AcmeActions
 
         // when each domain was added, and - while it is still inside the refund window of its own addition - until
         // when removing it gives the money back (the slot is then free to be given back as well)
-        $refundDays = \ModulesGarden\TSSPlugin\App\Libs\SubscriptionBilling::REFUND_DAYS;
+        $refundDays = \TSSPlugin\App\Libs\Subscriptions\SubscriptionBilling::REFUND_DAYS;
         foreach($domains as $domainRow)
         {
             $added = (string)($domainRow->added_at ?: $domainRow->created_at);
@@ -200,28 +176,28 @@ trait AcmeActions
         // auto renewal stopped: the subscription ends with its period and a cancel is refused (GGS-3, both vendors) -
         // the page shows the end date instead of the Cancel button
         $vars['endsAtPeriodEnd']        = $this->endsAtPeriodEnd($serviceId, $subscription);
-        $vars['endsAtPeriodEndNote']    = $vars['endsAtPeriodEnd'] ? str_replace(':date:', \ModulesGarden\TSSPlugin\App\Libs\SubscriptionState::periodEndText($subscription), Lang::absoluteT('serverCA', 'home', 'acmeEndsAtPeriodEnd')) : '';
+        $vars['endsAtPeriodEndNote']    = $vars['endsAtPeriodEnd'] ? str_replace(':date:', \TSSPlugin\App\Libs\Subscriptions\SubscriptionState::periodEndText($subscription), Lang::absoluteT('serverCA', 'home', 'acmeEndsAtPeriodEnd')) : '';
         // the EAB keys work only once the ACME account is active; a renewal the vendor could not charge stops new certificates
-        $vars['acmeKeysUsable']         = \ModulesGarden\TSSPlugin\App\Libs\SubscriptionState::keysUsable($subscription);
-        $vars['renewalUnpaid']          = \ModulesGarden\TSSPlugin\App\Libs\SubscriptionState::renewalUnpaid($subscription);
+        $vars['acmeKeysUsable']         = \TSSPlugin\App\Libs\Subscriptions\SubscriptionState::keysUsable($subscription);
+        $vars['renewalUnpaid']          = \TSSPlugin\App\Libs\Subscriptions\SubscriptionState::renewalUnpaid($subscription);
         $vars['configurationStatus']    = $sslService ? $sslService->status : null;
         $vars['configurationURL']       = 'clientarea.php?action=productdetails&id=' . $serviceId . '&acmeconfig=1';
 
         if($vars['configurationStatus'] === 'Awaiting Configuration')
         {
-            return array(
+            return [
                 'tpl'  => 'home_acme_awaiting_configuration',
                 'vars' => $vars
-            );
+            ];
         }
 
-        return array(
+        return [
             'tpl'  => 'home_acme',
             'vars' => $vars
-        );
+        ];
     }
 
-    private function acmeConfigurationHTML($input, $vars = array())
+    private function acmeConfigurationHTML($input, $vars = [])
     {
         $whmcsProductId = (int)$input['params']['packageid'];
         $serviceId      = (int)$input['params']['serviceid'];
@@ -250,13 +226,13 @@ trait AcmeActions
         $vars['singleDomainsLimit']   = $singleLimit;
         $vars['wildcardDomainsLimit'] = $wildcardLimit;
 
-        return array(
+        return [
             'tpl'  => 'home_acme_configuration',
             'vars' => $vars
-        );
+        ];
     }
 
-    public function createSubscriptionJSON($input, $vars = array())
+    public function createSubscriptionJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
         $this->requireOrderableService($input, AcmeHelpers::isAcmeWhmcsProduct((int)$input['params']['packageid']));
@@ -367,8 +343,8 @@ trait AcmeActions
         $response = $api->createAcmeSubscription($order);
 
         $apiOrderId   = isset($response['order_id']) ? (int)$response['order_id'] : (isset($response['id']) ? (int)$response['id'] : 0);
-        $apiItems     = isset($response['items']) && is_array($response['items']) ? $response['items'] : array();
-        $apiFirstItem = isset($apiItems[0]) && is_array($apiItems[0]) ? $apiItems[0] : array();
+        $apiItems     = isset($response['items']) && is_array($response['items']) ? $response['items'] : [];
+        $apiFirstItem = isset($apiItems[0]) && is_array($apiItems[0]) ? $apiItems[0] : [];
         $acmeId       = isset($apiFirstItem['id']) ? (int)$apiFirstItem['id'] : (isset($response['item_id']) ? (int)$response['item_id'] : 0);
 
         if($apiOrderId <= 0)
@@ -441,7 +417,7 @@ trait AcmeActions
         ];
     }
 
-    public function buyMoreDomainsJSON($input, $vars = array())
+    public function buyMoreDomainsJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
         $this->requireOrderableService($input, AcmeHelpers::isAcmeWhmcsProduct((int)$input['params']['packageid']));
@@ -555,7 +531,7 @@ trait AcmeActions
         ];
     }
 
-    public function upgradeConfigOptionsJSON($input, $vars = array())
+    public function upgradeConfigOptionsJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
         $params    = $input['params'];
@@ -592,14 +568,14 @@ trait AcmeActions
         // time, however long ago it was paid for; a slot holding a domain only while the vendor would still refund that
         // domain (within the refund window of the day THAT domain was added). So the check is how many slots are
         // refundable right now, per type.
-        $refundable = \ModulesGarden\TSSPlugin\App\Libs\SubscriptionBilling::refundableSlots($serviceId);
+        $refundable = \TSSPlugin\App\Libs\Subscriptions\SubscriptionBilling::refundableSlots($serviceId);
         foreach([['single', $hasSingle, $newSingle, $domainLimits['singleFromOption']], ['wildcard', $hasWildcard, $newWildcard, $domainLimits['wildcardFromOption']]] as $check)
         {
             list($type, $sent, $wanted, $current) = $check;
             $given = $sent ? (int)$current - (int)$wanted : 0;
             if($given > 0 && $given > $refundable[$type])
             {
-                throw new \Exception(sprintf(Lang::absoluteT('acme_downgrade_refund_window_passed'), \ModulesGarden\TSSPlugin\App\Libs\SubscriptionBilling::REFUND_DAYS));
+                throw new \Exception(sprintf(Lang::absoluteT('acme_downgrade_refund_window_passed'), \TSSPlugin\App\Libs\Subscriptions\SubscriptionBilling::REFUND_DAYS));
             }
         }
 
@@ -614,7 +590,7 @@ trait AcmeActions
                                 ->whereIn('tblinvoices.status', ['Unpaid', 'Overdue'])
                                 ->first();
 
-        if($unpaidInvoice || \ModulesGarden\TSSPlugin\App\Libs\SubscriptionBilling::pendingSlotPurchase($serviceId))
+        if($unpaidInvoice || \TSSPlugin\App\Libs\Subscriptions\SubscriptionBilling::pendingSlotPurchase($serviceId))
         {
             throw new \Exception(Lang::absoluteT('acme_upgrade_unpaid_invoice_exists'));
         }
@@ -714,7 +690,7 @@ trait AcmeActions
         $message = Lang::absoluteT('acme_upgrade_success');
         if($bought)
         {
-            $invoiceId = \ModulesGarden\TSSPlugin\App\Libs\SubscriptionBilling::createSlotPurchaseInvoice($serviceId, $bought);
+            $invoiceId = \TSSPlugin\App\Libs\Subscriptions\SubscriptionBilling::createSlotPurchaseInvoice($serviceId, $bought);
             if($invoiceId > 0)
             {
                 global $CONFIG;
@@ -729,7 +705,7 @@ trait AcmeActions
         ];
     }
 
-    public function removeDomainJSON($input, $vars = array())
+    public function removeDomainJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
         $serviceId = (int)$input['id'];
@@ -778,7 +754,7 @@ trait AcmeActions
         ];
     }
 
-    public function cancelSubscriptionJSON($input, $vars = array())
+    public function cancelSubscriptionJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
         $serviceId    = (int)$input['id'];
@@ -798,7 +774,7 @@ trait AcmeActions
         }
 
         // acme_id is the CaaS item ID (items[0].id), not the order ID; within the refund window the vendor refunds the order
-        $refundable = \ModulesGarden\TSSPlugin\App\Libs\SubscriptionBilling::orderRefundable($serviceId);
+        $refundable = \TSSPlugin\App\Libs\Subscriptions\SubscriptionBilling::orderRefundable($serviceId);
         CertificateService::api($serviceId)->cancelItem((int)$subscription->acme_id, 'Cancelled by client', 'caas', $refundable);
 
         $subscription->status       = 'cancelled';
@@ -810,7 +786,7 @@ trait AcmeActions
                                                                           'domainstatus' => 'Cancelled'
                                                                       ]);
 
-        $refundedCreditsAmount = \ModulesGarden\TSSPlugin\App\Libs\SubscriptionBilling::refundOnCancel($serviceId, 'Subscription cancelled by the client');
+        $refundedCreditsAmount = \TSSPlugin\App\Libs\Subscriptions\SubscriptionBilling::refundOnCancel($serviceId, 'Subscription cancelled by the client');
         $message               = Lang::absoluteT('acme_subscription_cancelled');
         if($refundedCreditsAmount > 0)
         {
@@ -826,7 +802,7 @@ trait AcmeActions
         ];
     }
 
-    public function stopAutoRenewalJSON($input, $vars = array())
+    public function stopAutoRenewalJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
         $serviceId    = (int)$input['id'];
@@ -855,7 +831,7 @@ trait AcmeActions
      */
     private function endsAtPeriodEnd($serviceId, $subscription)
     {
-        return \ModulesGarden\TSSPlugin\App\Libs\SubscriptionState::endsAtPeriodEnd($subscription);
+        return \TSSPlugin\App\Libs\Subscriptions\SubscriptionState::endsAtPeriodEnd($subscription);
     }
 
     /**
@@ -871,7 +847,7 @@ trait AcmeActions
         return ['primary' => $contact, 'technical' => $contact];
     }
 
-    public function checkCertificateDetailsJSON($input, $vars = array())
+    public function checkCertificateDetailsJSON($input, $vars = [])
     {
         $serviceId = (int)$input['id'];
 

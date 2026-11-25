@@ -1,11 +1,11 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Cron;
+namespace TSSPlugin\App\Cron;
 
-use ModulesGarden\TSSPlugin\App\Migration\Detector;
-use ModulesGarden\TSSPlugin\App\Migration\Engine;
-use ModulesGarden\TSSPlugin\App\Migration\Store;
-use ModulesGarden\TSSPlugin\Core\CommandLine\AbstractCommand;
+use TSSPlugin\App\Migration\Detector;
+use TSSPlugin\App\Migration\Engine;
+use TSSPlugin\App\Migration\Store;
+use TSSPlugin\App\Kernel\Console\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -23,7 +23,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *   php -q cron.php MigrateLegacy rollback --id=N
  *   php -q cron.php MigrateLegacy housekeeping          (expired backups, old log rows; also run by cron5)
  */
-class MigrateLegacy extends AbstractCommand
+class MigrateLegacy extends Command
 {
     /** "ref=gatewayId,ref=record" -> [ref => target] */
     protected static function map(string $raw): array
@@ -142,9 +142,9 @@ class MigrateLegacy extends AbstractCommand
     protected function source(InputInterface $input): string
     {
         $source = strtolower((string)$input->getOption('source'));
-        if(!in_array($source, [\ModulesGarden\TSSPlugin\App\Libs\Edition::get()], true))
+        if(!in_array($source, [\TSSPlugin\App\Libs\Support\Edition::get()], true))
         {
-            throw new \InvalidArgumentException('--source=' . \ModulesGarden\TSSPlugin\App\Libs\Edition::get() . ' is required');
+            throw new \InvalidArgumentException('--source=' . \TSSPlugin\App\Libs\Support\Edition::get() . ' is required');
         }
 
         return $source;

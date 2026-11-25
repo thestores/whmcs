@@ -1,22 +1,17 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Cron;
+namespace TSSPlugin\App\Cron;
 
-use Exception;
-use ModulesGarden\TSSPlugin\App\Libs\Helpers;
-use ModulesGarden\TSSPlugin\App\Models\CronCheck;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
-use ModulesGarden\TSSPlugin\Core\CommandLine\AbstractCommand;
-use ModulesGarden\TSSPlugin\Packages\Logs\Support\Facades\Logger;
+use TSSPlugin\App\Kernel\Console\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * Class Sample
- * @package ModulesGarden\TSSPlugin\App\Cron
+ * @package TSSPlugin\App\Cron
  */
-class ReSyncProducts extends AbstractCommand
+class ReSyncProducts extends Command
 {
     /**
      * Command name

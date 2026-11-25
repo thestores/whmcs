@@ -1,14 +1,13 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Models;
+namespace TSSPlugin\App\Models;
 
-use ModulesGarden\TSSPlugin\App\Libs\CatalogueSync;
-use ModulesGarden\TSSPlugin\App\Libs\Helpers;
-use ModulesGarden\TSSPlugin\App\Libs\ProductCatalog;
-use ModulesGarden\TSSPlugin\Core\Models\ExtendedEloquentModel;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Models\Product;
+use TSSPlugin\App\Libs\Products\CatalogueSync;
+use TSSPlugin\App\Libs\Support\Helpers;
+use TSSPlugin\App\Libs\Products\ProductCatalog;
+use TSSPlugin\App\Models\Whmcs\Product;
 
-class RemoteProduct extends ExtendedEloquentModel
+class RemoteProduct extends Model
 {
 
     public    $timestamps = true;

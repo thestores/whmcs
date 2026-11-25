@@ -11,7 +11,7 @@ $modulePath = dirname(__DIR__);
 $whmcsPath  = dirname(dirname(dirname($modulePath)));
 
 require_once $whmcsPath . DIRECTORY_SEPARATOR . 'init.php';
-require_once $modulePath . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Bootstrap.php';
+require_once $modulePath . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Kernel' . DIRECTORY_SEPARATOR . 'Boot.php';
 
 //cause WHMCS
 ini_set('max_execution_time', 0);
@@ -19,15 +19,15 @@ ini_set('max_execution_time', 0);
 // a module update swaps the files: no job starts meanwhile, and the update waits for running ones (they hold
 // cron.lock shared until they end; App\Libs\Update\Swap::pauseCrons)
 $moduleUpdateCommand = (string)(($_SERVER['argv'] ?? [])[1] ?? '') === 'ModuleUpdate'; // the update itself
-if (!$moduleUpdateCommand && \ModulesGarden\TSSPlugin\App\Libs\Update\State::locked())
+if (!$moduleUpdateCommand && \TSSPlugin\App\Libs\Update\State::locked())
 {
     echo "Module update in progress - the job runs next time.\n";
     exit;
 }
 $moduleUpdateCronLock = null;
-if (!$moduleUpdateCommand && is_dir(\ModulesGarden\TSSPlugin\App\Libs\Update\Workdir::path()))
+if (!$moduleUpdateCommand && is_dir(\TSSPlugin\App\Libs\Update\Workdir::path()))
 {
-    $moduleUpdateCronLock = \ModulesGarden\TSSPlugin\App\Libs\Update\Swap::openLock('cron.lock');
+    $moduleUpdateCronLock = \TSSPlugin\App\Libs\Update\Swap::openLock('cron.lock');
     // an update holds it exclusively while it swaps: this job then does not start at all (it would load old and new
     // files mixed)
     if ($moduleUpdateCronLock && !@flock($moduleUpdateCronLock, LOCK_SH | LOCK_NB))
@@ -38,11 +38,11 @@ if (!$moduleUpdateCommand && is_dir(\ModulesGarden\TSSPlugin\App\Libs\Update\Wor
 }
 
 // an install upgraded by copying files, where WHMCS never ran the addon upgrade, is still moved over
-foreach (['TablePrefix', 'ModuleRename', 'SchemaIndexes'] as $step)
+foreach (['\\TSSPlugin\\App\\Libs\\Support\\TablePrefix', '\\TSSPlugin\\App\\Libs\\Support\\ModuleRename', '\\TSSPlugin\\App\\Database\\Schema'] as $step)
 {
     try
     {
-        call_user_func(['\\ModulesGarden\\TSSPlugin\\App\\Libs\\' . $step, 'migrate']);
+        call_user_func([$step, 'migrate']);
     }
     catch (\Throwable $e)
     {
@@ -56,5 +56,5 @@ if (count($argList) === 0)
     $argList = [__FILE__];
 }
 
-(new \ModulesGarden\TSSPlugin\Core\CommandLine\CronManager())
+(new \TSSPlugin\App\Kernel\Console\Runner())
     ->run();

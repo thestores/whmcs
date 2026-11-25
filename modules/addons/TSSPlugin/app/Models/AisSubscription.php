@@ -1,11 +1,10 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Models;
+namespace TSSPlugin\App\Models;
 
-use ModulesGarden\TSSPlugin\App\Libs\SecretValue;
-use ModulesGarden\TSSPlugin\Core\Models\ExtendedEloquentModel;
+use TSSPlugin\App\Libs\Support\SecretValue;
 
-class AisSubscription extends ExtendedEloquentModel
+class AisSubscription extends Model
 {
     public $timestamps = true;
     protected $table = 'AisSubscriptions';

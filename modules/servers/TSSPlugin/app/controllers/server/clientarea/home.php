@@ -1,45 +1,19 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\app\controllers\server\clientarea;
+namespace TSSPlugin\Server\app\controllers\server\clientarea;
 
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Client;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Order;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Product;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Service;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\SSL;
-use ModulesGarden\Servers\TSSPlugin\app\repository\whmcs\Config;
-use ModulesGarden\Servers\TSSPlugin\app\repository\whmcs\Domain;
-use ModulesGarden\Servers\TSSPlugin\app\repository\whmcs\ProductConfigOptions;
-use ModulesGarden\Servers\TSSPlugin\app\services\InvoiceRenew;
-use ModulesGarden\Servers\TSSPlugin\app\services\SSLStepThree;
-use ModulesGarden\Servers\TSSPlugin\core\Lang;
-use ModulesGarden\Servers\TSSPlugin\core\process\AbstractController;
-use ModulesGarden\Servers\TSSPlugin\Server;
-use ModulesGarden\TSSPlugin\App\Helpers\EmailTemplates;
-use ModulesGarden\TSSPlugin\App\Libs\AcmeHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\AisHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\AutoInstallHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\CertificateBundle;
-use ModulesGarden\TSSPlugin\App\Libs\CertificateService;
-use ModulesGarden\TSSPlugin\App\Libs\CertificateSyncHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\Cpanel;
-use ModulesGarden\TSSPlugin\App\Libs\GeneralSettings;
-use ModulesGarden\TSSPlugin\App\Libs\ProductSettings;
-use ModulesGarden\TSSPlugin\App\Libs\SmimeService;
-use ModulesGarden\TSSPlugin\App\Libs\CodeSigningService;
-use ModulesGarden\TSSPlugin\App\Libs\SslProductHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\Helpers;
-use ModulesGarden\TSSPlugin\App\Libs\SSLTrustCenterApi;
-use ModulesGarden\TSSPlugin\App\Models\AcmeSubscription;
-use ModulesGarden\TSSPlugin\App\Models\AcmeSubscriptionDomain;
-use ModulesGarden\TSSPlugin\App\Models\AisSubscription;
-use ModulesGarden\TSSPlugin\App\Models\RemoteProduct;
-use ModulesGarden\TSSPlugin\App\Models\Request;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\ProductRepository;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Helper;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Models\Invoice;
-use WHMCS\Billing\Tax;
+use TSSPlugin\Server\app\models\whmcs\Client;
+use TSSPlugin\Server\app\models\whmcs\Order;
+use TSSPlugin\Server\app\models\whmcs\Product;
+use TSSPlugin\Server\app\models\whmcs\Service;
+use TSSPlugin\Server\app\models\whmcs\SSL;
+use TSSPlugin\Server\core\Lang;
+use TSSPlugin\Server\core\process\AbstractController;
+use TSSPlugin\App\Libs\Subscriptions\AcmeHelpers;
+use TSSPlugin\App\Libs\Subscriptions\AisHelpers;
+use TSSPlugin\App\Libs\ProductLines\SmimeService;
+use TSSPlugin\App\Libs\ProductLines\CodeSigningService;
+use TSSPlugin\App\Models\Request;
 use WHMCS\Database\Capsule;
 
 class home extends AbstractController
@@ -79,21 +53,21 @@ class home extends AbstractController
                 return $this->indexCodeSigningHTML($input, $vars);
             }
 
-            if(\ModulesGarden\TSSPlugin\App\Libs\CodeGuardService::isCodeGuardWhmcsProduct($service->packageid))
+            if(\TSSPlugin\App\Libs\ProductLines\CodeGuardService::isCodeGuardWhmcsProduct($service->packageid))
             {
                 return $this->indexCodeGuardHTML($input, $vars);
             }
 
-            if(\ModulesGarden\TSSPlugin\App\Libs\DocumentSigningService::isDocumentSigningWhmcsProduct($service->packageid))
+            if(\TSSPlugin\App\Libs\ProductLines\DocumentSigningService::isDocumentSigningWhmcsProduct($service->packageid))
             {
                 return $this->indexDocumentSigningHTML($input, $vars);
             }
 
-            if(\ModulesGarden\TSSPlugin\App\Libs\PciService::isPciWhmcsProduct($service->packageid))
+            if(\TSSPlugin\App\Libs\ProductLines\PciService::isPciWhmcsProduct($service->packageid))
             {
                 return $this->indexPciHTML($input, $vars);
             }
-            if(\ModulesGarden\TSSPlugin\App\Libs\LeiService::isLeiWhmcsProduct($service->packageid))
+            if(\TSSPlugin\App\Libs\ProductLines\LeiService::isLeiWhmcsProduct($service->packageid))
             {
                 return $this->indexLeiHTML($input, $vars);
             }
@@ -165,7 +139,7 @@ class home extends AbstractController
 
     private function requireCsrfToken()
     {
-        if($_SERVER['REQUEST_METHOD'] !== 'POST' || !\ModulesGarden\TSSPlugin\App\Libs\CsrfToken::valid($_POST['token'] ?? ''))
+        if($_SERVER['REQUEST_METHOD'] !== 'POST' || !\TSSPlugin\App\Libs\Support\CsrfToken::valid($_POST['token'] ?? ''))
         {
             throw new \Exception(Lang::absoluteT('invalidCsrfToken'));
         }

@@ -1,8 +1,8 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin;
+namespace TSSPlugin\Server;
 
-use ModulesGarden\Servers\TSSPlugin\core\process\AbstractConfiguration;
+use TSSPlugin\Server\core\process\AbstractConfiguration;
 
 class Configuration extends AbstractConfiguration
 {
@@ -12,10 +12,10 @@ class Configuration extends AbstractConfiguration
     public $description = '';
     public $clientareaName = 'GoGetSSL Module';
     public $encryptHash = 'uUc1Y8cWxDOGaby11lBwelqzo6PGMTA0dbHaKQ109olufoJgIFBOgmReKCZbpCYpASnrtfjmCIUyplaBJaUh40auDALprOHtj1g92ZRBS6S94IbZWaeZRYkG1f81h6qLMYEOr016RurCnmodFCWdMkTqrlVBvH249gzXPduKQVXpN9hooComaRPY5jZD6s8GdfR5E_BNP3v8Ui8RrdqMPST_8quMW48LhHY88xCvSWwDNjkC2tCAaK67Id2NjzIdoNTHUMISRg81nHX8ZGcbP74mxixo_ASd8YoWnDCAs8yiT4t0PwKRO_y3C1kDo69Nxz1YYt4tY1VzOD_DFBulAA5NCJLfogroo';
-    public $version = '1.18.0';
+    public $version = '2.0.0';
     public $author = 'TheSSLStore';
 
-    /** Tables are named by the edition - see App\Libs\Edition::table() */
+    /** Tables are named by the edition - see App\Libs\Support\Edition::table() */
     public $tablePrefix = false;
     public $modelRegister = [];
 
@@ -25,14 +25,14 @@ class Configuration extends AbstractConfiguration
         // The name is the edition's own: it is read here even where nothing has loaded the addon yet, so that
         // neither edition can ever show the other one's name.
         $edition = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'addons' . DIRECTORY_SEPARATOR . basename(__DIR__)
-            . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Libs' . DIRECTORY_SEPARATOR . 'Edition.php';
-        if(!class_exists('\ModulesGarden\TSSPlugin\App\Libs\Edition', false) && is_file($edition))
+            . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Libs' . DIRECTORY_SEPARATOR . 'Support' . DIRECTORY_SEPARATOR . 'Edition.php';
+        if(!class_exists('\TSSPlugin\App\Libs\Support\Edition', false) && is_file($edition))
         {
             require_once $edition;
         }
-        if(class_exists('\ModulesGarden\TSSPlugin\App\Libs\Edition', false))
+        if(class_exists('\TSSPlugin\App\Libs\Support\Edition', false))
         {
-            $this->name           = \ModulesGarden\TSSPlugin\App\Libs\Edition::name();
+            $this->name           = \TSSPlugin\App\Libs\Support\Edition::name();
             $this->clientareaName = $this->name;
         }
     }

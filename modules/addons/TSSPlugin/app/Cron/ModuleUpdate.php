@@ -1,13 +1,13 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Cron;
+namespace TSSPlugin\App\Cron;
 
-use ModulesGarden\TSSPlugin\App\Libs\Update\Installer;
-use ModulesGarden\TSSPlugin\App\Libs\Update\Preflight;
-use ModulesGarden\TSSPlugin\App\Libs\Update\Release;
-use ModulesGarden\TSSPlugin\App\Libs\Update\State;
-use ModulesGarden\TSSPlugin\App\Libs\Update\Workdir;
-use ModulesGarden\TSSPlugin\Core\CommandLine\AbstractCommand;
+use TSSPlugin\App\Libs\Update\Installer;
+use TSSPlugin\App\Libs\Update\Preflight;
+use TSSPlugin\App\Libs\Update\Release;
+use TSSPlugin\App\Libs\Update\State;
+use TSSPlugin\App\Libs\Update\Workdir;
+use TSSPlugin\App\Kernel\Console\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -20,7 +20,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *   php cron/cron.php ModuleUpdate --rollback   put the previous version back from its backup
  * An update that stopped half way is repaired with: php modules/.<folder>-update/recover.php
  */
-class ModuleUpdate extends AbstractCommand
+class ModuleUpdate extends Command
 {
     protected $name = 'ModuleUpdate';
 

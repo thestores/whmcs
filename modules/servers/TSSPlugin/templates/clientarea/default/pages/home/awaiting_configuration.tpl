@@ -19,6 +19,20 @@
         </div>
         <div class="tss-hero__foot">
             {if $renewalNotice}<p class="tss-renewal-notice"><strong>{$renewalNotice|escape}</strong></p>{/if}
+            {if $certificateToken}
+                {* the certificate is bought: its token completes and manages the order in any plugin (IncompleteOrder) *}
+                <div class="tss-token">
+                    <p class="tss-token__title">{$MGLANG->T('awaiting_configuration', 'tokenTitle')}</p>
+                    <p class="tss-token__text">{$MGLANG->T('awaiting_configuration', 'tokenText')}</p>
+                    <div class="tss-token__row">
+                        <input type="text" class="tss-token__value tss-mono" id="tss-token-{$serviceid}" value="{$certificateToken|escape}" readonly aria-label="{$MGLANG->T('awaiting_configuration', 'tokenTitle')|escape}">
+                        <button type="button" class="tss-btn tss-token__copy" data-copy-target="tss-token-{$serviceid}" data-copied="{$MGLANG->T('awaiting_configuration', 'tokenCopied')|escape}">
+                            <svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                            <span>{$MGLANG->T('awaiting_configuration', 'tokenCopy')}</span>
+                        </button>
+                    </div>
+                </div>
+            {/if}
             <p>{$MGLANG->T('awaiting_configuration', 'desc')}</p>
             <div class="tss-actions">
                 <a class="tss-btn tss-btn--primary" href="{$url|escape}">
@@ -72,10 +86,23 @@
     $(document).ready(function () {
         var clone = $('.validate-ssl-unified').clone();
         $('.product-details').html(clone);
-        $('.mg-module .validate-ssl-unified').remove();
+        $('.mod-module .validate-ssl-unified').remove();
         // the module's stylesheet lives in the block below and has to survive it
         $('head').append($('link[href*="theme.css"]').first());
         // WHMCS's own tab strip under the page: the module shows everything above it
         $('.product-details').closest('.tab-pane').find('> .nav-tabs, > .tab-content').remove();
     });
+    // the block above is cloned: a delegated handler survives it
+    $(document).on('click', '.tss-token__copy', function () {
+        var button = this, input = document.getElementById(button.getAttribute('data-copy-target'));
+        if (!input) { return; }
+        var label = button.querySelector('span'), text = label.textContent;
+        var done = function () { label.textContent = button.getAttribute('data-copied'); setTimeout(function () { label.textContent = text; }, 2000); };
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(input.value).then(done, function () { input.select(); document.execCommand('copy'); done(); });
+        } else {
+            input.select(); document.execCommand('copy'); done();
+        }
+    });
+    $(document).on('focus click', '.tss-token__value', function () { this.select(); });
 </script>

@@ -1,6 +1,6 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\core\process;
+namespace TSSPlugin\Server\core\process;
 
 class MainInstance {
     static private $_instanceName;

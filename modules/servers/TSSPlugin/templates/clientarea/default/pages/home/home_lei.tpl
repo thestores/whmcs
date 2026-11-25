@@ -33,7 +33,11 @@
             <p>
                 {if $leiStatus == 'active'}{if $leiIsRenewal}{$MGLANG->T('leiInfoRenewed')}{else}{$MGLANG->T('leiInfoActive')}{/if}
                 {elseif $leiStatus == 'incomplete'}{$MGLANG->T('leiInfoIncomplete')}
-                {elseif $leiStatus == 'pending'}{$MGLANG->T('leiInfoPending')}
+                {elseif $leiStatus == 'need_action'}{$MGLANG->T('leiInfoNeedAction')}
+                {elseif $leiStatus == 'user_confirmed'}{$MGLANG->T('leiInfoUserConfirmed')}
+                {elseif $leiStatus == 'pending' || $leiStatus == 'pre_issue'}{$MGLANG->T('leiInfoPending')}
+                {elseif $leiStatus == 'failed'}{$MGLANG->T('leiInfoFailed')}
+                {elseif $leiStatus == 'revoked'}{$MGLANG->T('leiInfoRevoked')}
                 {elseif $leiStatus == 'unpaid'}{$MGLANG->T('smimeInfoContactSupport')}
                 {elseif $leiStatus == 'expired'}{$MGLANG->T('leiInfoExpired')}
                 {elseif $leiTone == 'wait'}{if $leiIsRenewal}{$MGLANG->T('leiInfoRenewalProcessing')}{else}{$MGLANG->T('leiInfoProcessing')}{/if}
@@ -41,6 +45,12 @@
                 {else}{$MGLANG->T('smimeInfoContactSupport')}{/if}
             </p>
             <div class="tss-actions">
+                {if $leiNeedsConfirm}
+                    <button id="tss-lei-confirm" type="button" class="tss-btn tss-btn--primary">
+                        <svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                        <span>{$MGLANG->T('leiConfirmButton')}</span>
+                    </button>
+                {/if}
                 {if $leiGleifUrl}
                     <a class="tss-btn" href="{$leiGleifUrl|escape}" target="_blank" rel="noopener">
                         <svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
@@ -67,6 +77,9 @@
                 <svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8M16 13H8M16 17H8"/></svg>
                 {$MGLANG->T('leiCardEntity')}
             </h4>
+            {if $leiNeedsConfirm}
+                <p>{$MGLANG->T('leiConfirmHint')}</p>
+            {/if}
             <dl class="tss-dl">
                 <dt>{$MGLANG->T('leiNumberLabel')}</dt><dd class="tss-mono">{if $leiNumber}{$leiNumber|escape}{else}{$MGLANG->T('validation_page', 'NA')}{/if}</dd>
                 <dt>{$MGLANG->T('leiField_legal_name')}</dt><dd>{if $leiLegalName}{$leiLegalName|escape}{else}{$MGLANG->T('validation_page', 'NA')}{/if}</dd>
@@ -75,6 +88,7 @@
                 <dt>{$MGLANG->T('leiLegalAddress')}</dt><dd>{if $leiLegalAddress}{$leiLegalAddress|escape}{else}{$MGLANG->T('validation_page', 'NA')}{/if}</dd>
                 {if $leiHqAddress && $leiHqAddress != $leiLegalAddress}<dt>{$MGLANG->T('leiHqAddress')}</dt><dd>{$leiHqAddress|escape}</dd>{/if}
                 <dt>{$MGLANG->T('leiSigningSection')}</dt><dd>{if $leiSigner}{$leiSigner|escape}{else}{$MGLANG->T('validation_page', 'NA')}{/if}</dd>
+                {if $leiRaCode}<dt>{$MGLANG->T('leiRaCode')}</dt><dd class="tss-mono">{$leiRaCode|escape}</dd>{/if}
             </dl>
         </section>
 
@@ -99,7 +113,7 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <form method="post" action="clientarea.php?action=productdetails&id={$serviceid}">
-                    <input type="hidden" name="mg-action" value="renewOrder">
+                    <input type="hidden" name="mod-action" value="renewOrder">
                     <input type="hidden" name="token" value="{$csrfToken}">
                     <div class="modal-header" style="display:block;">
                         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
@@ -136,17 +150,41 @@
     $(document).ready(function () {
         var clone = $('.validate-ssl-unified').clone();
         $('.product-details').html(clone);
-        $('.mg-module .validate-ssl-unified').remove();
+        $('.mod-module .validate-ssl-unified').remove();
         // the module's stylesheet lives in the block below and has to survive it
         $('head').append($('link[href*="theme.css"]').first());
         // WHMCS's own tab strip under the page: the module shows everything above it
         $('.product-details').closest('.tab-pane').find('> .nav-tabs, > .tab-content').remove();
     });
 
+    $(document).on('click', '#tss-lei-confirm', function () {
+        var btn = $(this), alerts = $('#tss-lei-alerts');
+        if (!window.confirm('{$MGLANG->T('leiConfirmAsk')|escape:'javascript'}')) {
+            return;
+        }
+        btn.prop('disabled', true);
+        $.post('clientarea.php?action=productdetails&id={$serviceid}&json=1', {ldelim}'mod-action': 'confirmLei', token: '{$csrfToken}'{rdelim}, function (ret) {
+            var payload;
+            try {
+                payload = typeof ret === 'object' ? ret : JSON.parse(String(ret).replace('<JSONRESPONSE#', '').replace('#ENDJSONRESPONSE>', ''));
+            } catch (e) {
+                payload = {ldelim}result: 'error'{rdelim};
+            }
+            if (payload.result === 'error') {
+                alerts.html($('<div class="alert alert-danger" role="alert"></div>').text(payload.error || '{$MGLANG->T('smimeErrorOccurred')|escape:'javascript'}'));
+                btn.prop('disabled', false);
+                return;
+            }
+            window.location.reload();
+        }).fail(function () {
+            alerts.html($('<div class="alert alert-danger" role="alert"></div>').text('{$MGLANG->T('smimeErrorOccurred')|escape:'javascript'}'));
+            btn.prop('disabled', false);
+        });
+    });
     $(document).on('click', '#tss-lei-refresh', function () {
         var btn = $(this), alerts = $('#tss-lei-alerts');
         btn.prop('disabled', true);
-        $.post('clientarea.php?action=productdetails&id={$serviceid}&json=1', {ldelim}'mg-action': 'refreshLeiDetails', token: '{$csrfToken}'{rdelim}, function (ret) {
+        $.post('clientarea.php?action=productdetails&id={$serviceid}&json=1', {ldelim}'mod-action': 'refreshLeiDetails', token: '{$csrfToken}'{rdelim}, function (ret) {
             var payload;
             try {
                 payload = typeof ret === 'object' ? ret : JSON.parse(String(ret).replace('<JSONRESPONSE#', '').replace('#ENDJSONRESPONSE>', ''));

@@ -1,13 +1,13 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Migration;
+namespace TSSPlugin\App\Migration;
 
-use ModulesGarden\TSSPlugin\App\Libs\AutoInstallQueue;
-use ModulesGarden\TSSPlugin\App\Libs\Markups;
-use ModulesGarden\TSSPlugin\App\Libs\Edition;
-use ModulesGarden\TSSPlugin\App\Models\RemoteProduct;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
-use ModulesGarden\TSSPlugin\App\Libs\GatewayOrderService;
+use TSSPlugin\App\Libs\AutoInstall\AutoInstallQueue;
+use TSSPlugin\App\Libs\Billing\Markups;
+use TSSPlugin\App\Libs\Support\Edition;
+use TSSPlugin\App\Models\RemoteProduct;
+use TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
+use TSSPlugin\App\Libs\ProductLines\GatewayOrderService;
 use WHMCS\Database\Capsule;
 
 /**
@@ -63,7 +63,7 @@ class Writer
 
         // renewal timing moves as a pair (lead + payment term) or the migrated services' due dates would shift; the
         // legacy pair is used unless this module's payment term (1.5.0) was already set - the administrator's choice
-        foreach(\ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::KEYS as [, $leadKey, $termKey])
+        foreach(\TSSPlugin\App\Libs\Billing\RenewalPolicy::KEYS as [, $leadKey, $termKey])
         {
             if(isset($legacySsl[$leadKey], $legacySsl[$termKey]) && (!isset($ssl[$termKey]) || $ssl[$termKey] === '' || $ssl[$termKey] === null))
             {
@@ -165,7 +165,7 @@ class Writer
         $renamed = [];
         foreach((array)$product['san_options'] as $option)
         {
-            $display = $option['display'] !== '' ? $option['display'] : \ModulesGarden\TSSPlugin\App\Libs\ProductCatalog::optionLabel($option['role'] === 'sans' ? 'single' : 'wildcard');
+            $display = $option['display'] !== '' ? $option['display'] : \TSSPlugin\App\Libs\Products\ProductCatalog::optionLabel($option['role'] === 'sans' ? 'single' : 'wildcard');
             $newName = $option['role'] . '|' . $display;
             Capsule::table('tblproductconfigoptions')->where('id', $option['id'])->update(['optionname' => $newName, 'hidden' => 0]);
             // the unified code counts sub-options named "SAN"
@@ -182,16 +182,16 @@ class Writer
             Capsule::table('tblproductconfigoptions')->where('id', $option['id'])->update(['hidden' => 1]);
         }
         // code signing: the legacy delivery option becomes the module's "Certificate Delivery" option, else a new one
-        if(strtolower((string)$remote->category) === \ModulesGarden\TSSPlugin\App\Libs\CodeSigningService::CATEGORY)
+        if(strtolower((string)$remote->category) === \TSSPlugin\App\Libs\ProductLines\CodeSigningService::CATEGORY)
         {
             $rawData = is_array($remote->rawData) ? $remote->rawData : [];
             if(!empty($product['cs_delivery_option']['id']))
             {
-                \ModulesGarden\TSSPlugin\App\Libs\CodeSigningService::adoptLegacyDeliveryOption((int)$product['pid'], (int)$product['cs_delivery_option']['id'], $rawData);
+                \TSSPlugin\App\Libs\ProductLines\CodeSigningService::adoptLegacyDeliveryOption((int)$product['pid'], (int)$product['cs_delivery_option']['id'], $rawData);
             }
             else
             {
-                \ModulesGarden\TSSPlugin\App\Libs\CodeSigningService::createDeliveryOption((int)$product['pid'], $rawData);
+                \TSSPlugin\App\Libs\ProductLines\CodeSigningService::createDeliveryOption((int)$product['pid'], $rawData);
             }
         }
 
@@ -229,7 +229,7 @@ class Writer
             }
         }
         $pid = (int)$product['pid'];
-        if(!$legacy || !\ModulesGarden\TSSPlugin\App\Libs\MainDomain::isChoice($remoteRaw, strtoupper($this->source)))
+        if(!$legacy || !\TSSPlugin\App\Libs\Certificates\MainDomain::isChoice($remoteRaw, strtoupper($this->source)))
         {
             return [];
         }
@@ -266,9 +266,9 @@ class Writer
         }
 
         // the module's option, Wildcard at the legacy difference
-        \ModulesGarden\TSSPlugin\App\Libs\MainDomain::ensureOption($pid, $remoteRaw);
+        \TSSPlugin\App\Libs\Certificates\MainDomain::ensureOption($pid, $remoteRaw);
         $option = Capsule::table('tblproductconfiglinks')->join('tblproductconfigoptions', 'tblproductconfigoptions.gid', '=', 'tblproductconfiglinks.gid')
-            ->where('tblproductconfiglinks.pid', $pid)->where('tblproductconfigoptions.optionname', 'like', \ModulesGarden\TSSPlugin\App\Libs\MainDomain::OPTION . '|%')
+            ->where('tblproductconfiglinks.pid', $pid)->where('tblproductconfigoptions.optionname', 'like', \TSSPlugin\App\Libs\Certificates\MainDomain::OPTION . '|%')
             ->value('tblproductconfigoptions.id');
         if(!$option)
         {
@@ -314,7 +314,7 @@ class Writer
     }
 
     /**
-     * A legacy product without a gateway equivalent, kept for its records (App\Libs\RecordOnly): on the module but
+     * A legacy product without a gateway equivalent, kept for its records (App\Libs\Certificates\RecordOnly): on the module but
      * without a gateway product, hidden and retired so it is never ordered again
      */
     public function writeRecordProduct(array $product): array
@@ -351,7 +351,7 @@ class Writer
             $serviceId = (int)$rec['service_id'];
             $written   = ['ssl_order_id' => (int)($rec['ssl_order_id'] ?? 0), 'requests' => [], 'queue' => [], 'acme' => 0, 'acme_domains' => [], 'ais' => 0];
             Capsule::table(self::tRequests())->where('serviceid', $serviceId)
-                ->whereIn('name', array_merge([\ModulesGarden\TSSPlugin\App\Libs\RecordOnly::REQUEST, 'addOrder', 'certificate', 'autoinstall', 'renewOrder'], GatewayOrderService::requestNames()))->delete();
+                ->whereIn('name', array_merge([\TSSPlugin\App\Libs\Certificates\RecordOnly::REQUEST, 'addOrder', 'certificate', 'autoinstall', 'renewOrder'], GatewayOrderService::requestNames()))->delete();
 
             $payload = (array)($rec['order_payload'] ?? []);
             $cert    = (array)($rec['certificate'] ?? []);
@@ -371,7 +371,7 @@ class Writer
                 'order'          => $payload,
                 'certificate'    => array_diff_key($cert, ['crt' => 1, 'ca' => 1]),
             ];
-            $written['requests'][] = $this->insertRequest($serviceId, \ModulesGarden\TSSPlugin\App\Libs\RecordOnly::REQUEST, $details, 'record', 0, 0, 0);
+            $written['requests'][] = $this->insertRequest($serviceId, \TSSPlugin\App\Libs\Certificates\RecordOnly::REQUEST, $details, 'record', 0, 0, 0);
 
             return $written;
         });
@@ -383,7 +383,6 @@ class Writer
      */
     public function writeMarkups(array $rules): array
     {
-        Markups::createTable();
         $ids = [];
         foreach($rules as $rule)
         {
@@ -431,7 +430,6 @@ class Writer
     public function writeService(array $rec, string $privateKeyPem = ''): array
     {
         // table creation inside the transaction would commit it implicitly (MySQL DDL)
-        AutoInstallQueue::createTables();
 
         return Capsule::connection()->transaction(function() use ($rec, $privateKeyPem) {
             $now     = date('Y-m-d H:i:s');
@@ -443,9 +441,11 @@ class Writer
                 $update['configdata'] = self::json($rec['configdata']);
             }
             Capsule::table('tblsslorders')->where('id', $rec['ssl_order_id'])->update($update);
+            // the old module may have stored the order ID: the order status sync converts it to the item ID
+            \TSSPlugin\App\Libs\Certificates\CertificateSyncHelpers::itemIdConversionRestart();
 
             // remove any unified rows a previous attempt left behind
-            Capsule::table(self::tRequests())->where('serviceid', $rec['service_id'])->whereIn('name', array_merge(['addOrder', 'certificate', 'autoinstall', 'renewOrder', \ModulesGarden\TSSPlugin\App\Libs\RecordOnly::REQUEST], GatewayOrderService::requestNames()))->delete();
+            Capsule::table(self::tRequests())->where('serviceid', $rec['service_id'])->whereIn('name', array_merge(['addOrder', 'certificate', 'autoinstall', 'renewOrder', \TSSPlugin\App\Libs\Certificates\RecordOnly::REQUEST], GatewayOrderService::requestNames()))->delete();
 
             $prices = (array)($rec['prices'] ?? []);
             $api    = (float)($prices['api_price'] ?? 0);
@@ -588,7 +588,7 @@ class Writer
             return [];
         }
         // options the run may create: code signing "Certificate Delivery", the FLEX "main_domain" choice
-        $prefixes = [\ModulesGarden\TSSPlugin\App\Libs\CodeSigningService::OPTION_PROVISIONING . '|', \ModulesGarden\TSSPlugin\App\Libs\MainDomain::OPTION . '|'];
+        $prefixes = [\TSSPlugin\App\Libs\ProductLines\CodeSigningService::OPTION_PROVISIONING . '|', \TSSPlugin\App\Libs\Certificates\MainDomain::OPTION . '|'];
         $options  = Capsule::table('tblproductconfiglinks')
             ->join('tblproductconfigoptions', 'tblproductconfigoptions.gid', '=', 'tblproductconfiglinks.gid')
             ->whereIn('tblproductconfiglinks.pid', $pids)

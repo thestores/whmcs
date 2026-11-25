@@ -1,10 +1,9 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Models;
+namespace TSSPlugin\App\Models;
 
-use ModulesGarden\TSSPlugin\Core\Models\ExtendedEloquentModel;
 
-class Request extends ExtendedEloquentModel
+class Request extends Model
 {
     public    $timestamps = true;
     protected $table      = 'Requests';

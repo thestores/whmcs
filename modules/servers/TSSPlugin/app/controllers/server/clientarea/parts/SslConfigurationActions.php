@@ -1,45 +1,24 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\app\controllers\server\clientarea\parts;
+namespace TSSPlugin\Server\app\controllers\server\clientarea\parts;
 
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Client;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Order;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Product;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Service;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\SSL;
-use ModulesGarden\Servers\TSSPlugin\app\repository\whmcs\Config;
-use ModulesGarden\Servers\TSSPlugin\app\repository\whmcs\Domain;
-use ModulesGarden\Servers\TSSPlugin\app\repository\whmcs\ProductConfigOptions;
-use ModulesGarden\Servers\TSSPlugin\app\services\InvoiceRenew;
-use ModulesGarden\Servers\TSSPlugin\app\services\SSLStepThree;
-use ModulesGarden\Servers\TSSPlugin\core\Lang;
-use ModulesGarden\Servers\TSSPlugin\core\process\AbstractController;
-use ModulesGarden\Servers\TSSPlugin\Server;
-use ModulesGarden\TSSPlugin\App\Helpers\EmailTemplates;
-use ModulesGarden\TSSPlugin\App\Libs\AcmeHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\AisHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\AutoInstallHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\CertificateBundle;
-use ModulesGarden\TSSPlugin\App\Libs\CertificateService;
-use ModulesGarden\TSSPlugin\App\Libs\CertificateSyncHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\Cpanel;
-use ModulesGarden\TSSPlugin\App\Libs\GeneralSettings;
-use ModulesGarden\TSSPlugin\App\Libs\ProductSettings;
-use ModulesGarden\TSSPlugin\App\Libs\SmimeService;
-use ModulesGarden\TSSPlugin\App\Libs\CodeSigningService;
-use ModulesGarden\TSSPlugin\App\Libs\SslProductHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\Helpers;
-use ModulesGarden\TSSPlugin\App\Libs\SSLTrustCenterApi;
-use ModulesGarden\TSSPlugin\App\Models\AcmeSubscription;
-use ModulesGarden\TSSPlugin\App\Models\AcmeSubscriptionDomain;
-use ModulesGarden\TSSPlugin\App\Models\AisSubscription;
-use ModulesGarden\TSSPlugin\App\Models\RemoteProduct;
-use ModulesGarden\TSSPlugin\App\Models\Request;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\ProductRepository;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Helper;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Models\Invoice;
-use WHMCS\Billing\Tax;
+use TSSPlugin\Server\app\models\whmcs\Client;
+use TSSPlugin\Server\app\models\whmcs\Order;
+use TSSPlugin\Server\app\models\whmcs\Product;
+use TSSPlugin\Server\app\models\whmcs\Service;
+use TSSPlugin\Server\app\models\whmcs\SSL;
+use TSSPlugin\Server\app\repository\whmcs\Domain;
+use TSSPlugin\Server\app\services\SSLStepThree;
+use TSSPlugin\Server\core\Lang;
+use TSSPlugin\Server\Server;
+use TSSPlugin\App\Libs\AutoInstall\AutoInstallHelpers;
+use TSSPlugin\App\Libs\Certificates\CertificateService;
+use TSSPlugin\App\Libs\AutoInstall\Cpanel;
+use TSSPlugin\App\Libs\Products\SslProductHelpers;
+use TSSPlugin\App\Libs\Gateway\SSLTrustCenterApi;
+use TSSPlugin\App\Models\RemoteProduct;
+use TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
+use TSSPlugin\App\Repositories\Whmcs\ProductRepository;
 use WHMCS\Database\Capsule;
 
 /**
@@ -145,7 +124,7 @@ trait SslConfigurationActions
         return $countries;
     }
 
-    private function sslConfigurationHTML($input, $vars = array())
+    private function sslConfigurationHTML($input, $vars = [])
     {
         $params    = $input['params'];
         $serviceId = (int)$params['serviceid'];
@@ -219,7 +198,7 @@ trait SslConfigurationActions
         $vars['assetsURL']          = Server::I()->getAssetsURL();
         $vars['productName']        = $settings['productName'];
         // a certificate for public IPs (CSR without common name): its names are entered as a list, no AutoInstall
-        $vars['ipProduct']          = \ModulesGarden\TSSPlugin\App\Libs\IpCertificate::isProduct($params['packageid']);
+        $vars['ipProduct']          = \TSSPlugin\App\Libs\Certificates\IpCertificate::isProduct($params['packageid']);
         $vars['domainGroups']       = $vars['ipProduct'] ? [] : $domainGroups;
         $vars['hasCpanel']          = !$vars['ipProduct'] && !empty($domainGroups);
         $vars['dcvMethods']         = $settings['dcvMethods'];
@@ -238,7 +217,7 @@ trait SslConfigurationActions
         $vars['productDomain']      = isset($params['domain']) ? $params['domain'] : '';
         // the free www name of the main domain (www.example.com / example.com), tested 2026-11-17: a product without
         // SAN support gets it from the vendor; a SAN-capable product does not - there the www names can be picked as
-        // additional domains (App\Libs\FreeName)
+        // additional domains (App\Libs\Certificates\FreeName)
         $vars['wwwAlwaysFree']      = $this->productWithoutSans($params['packageid']);
         $vars['wwwInSanList']       = !$vars['wwwAlwaysFree'] && $settings['sansLimit'] > 0;
         if($vars['wwwInSanList'])
@@ -275,7 +254,7 @@ trait SslConfigurationActions
         ] : [];
 
         // a paid renewal waiting for these details: the client is told so, and until when the current certificate holds
-        $renewalUntil          = \ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::pendingRenewalUntil((int)$serviceId);
+        $renewalUntil          = \TSSPlugin\App\Libs\Billing\RenewalPolicy::pendingRenewalUntil((int)$serviceId);
         $vars['renewalNotice'] = $renewalUntil !== '' ? sprintf(Lang::absoluteT('sslRenewalPendingNotice'), $this->smimeDate($renewalUntil)) : '';
 
         return [
@@ -284,7 +263,7 @@ trait SslConfigurationActions
         ];
     }
 
-    public function getApproverEmailsJSON($input, $vars = array())
+    public function getApproverEmailsJSON($input, $vars = [])
     {
         $domain = isset($input['domain']) ? strtolower(trim($input['domain'])) : '';
         if(strpos($domain, '*.') === 0)
@@ -359,7 +338,7 @@ trait SslConfigurationActions
         return !empty($raw['san']['ip_allowed']);
     }
 
-    public function submitSslConfigurationJSON($input, $vars = array())
+    public function submitSslConfigurationJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
 
@@ -385,6 +364,8 @@ trait SslConfigurationActions
         $serviceId = (int)$params['serviceid'];
         $userId    = (int)$params['userid'];
 
+        // a migrated order bought at payment: completed with its token (read once)
+        \TSSPlugin\App\Libs\Certificates\IncompleteOrder::claimMigrated($serviceId);
         $ssl = SSL::getByServiceId($serviceId);
         if(!$ssl || $ssl->status !== 'Awaiting Configuration' || !empty($ssl->remoteid))
         {
@@ -398,8 +379,8 @@ trait SslConfigurationActions
 
         $settings    = $this->getSslConfigurationSettings($params);
         $installType = (isset($input['install_type']) && $input['install_type'] === 'autoinstall') ? 'autoinstall' : 'manual';
-        // a certificate for public IPs (CSR without common name, App\Libs\IpCertificate): manual enrollment only
-        $ipProduct = \ModulesGarden\TSSPlugin\App\Libs\IpCertificate::isProduct($params['packageid']);
+        // a certificate for public IPs (CSR without common name, App\Libs\Certificates\IpCertificate): manual enrollment only
+        $ipProduct = \TSSPlugin\App\Libs\Certificates\IpCertificate::isProduct($params['packageid']);
         if($ipProduct)
         {
             $installType = 'manual';
@@ -602,9 +583,9 @@ trait SslConfigurationActions
                 : [];
         }
 
-        \ModulesGarden\TSSPlugin\App\Libs\SanUpgrade::assertWithinLimits($serviceId, $commonName, $allDomains, \ModulesGarden\TSSPlugin\App\Libs\SanUpgrade::paidQuantities($params));
+        \TSSPlugin\App\Libs\Billing\SanUpgrade::assertWithinLimits($serviceId, $commonName, $allDomains, \TSSPlugin\App\Libs\Billing\SanUpgrade::paidQuantities($params));
         // *. only on a wildcard product, or a FLEX product with the Wildcard choice paid
-        \ModulesGarden\TSSPlugin\App\Libs\MainDomain::assertCommonName((int)$serviceId, (string)$commonName);
+        \TSSPlugin\App\Libs\Certificates\MainDomain::assertCommonName((int)$serviceId, (string)$commonName);
 
         foreach($allDomains as $domain)
         {
@@ -684,7 +665,8 @@ trait SslConfigurationActions
         $result = (new SSLStepThree())->run($stepParams);
 
         $ssl = SSL::getByServiceId($serviceId);
-        if(empty($ssl->remoteid))
+        // the token completed the order elsewhere meanwhile: the service follows that order, these details are not used
+        if(empty($ssl->remoteid) || (is_array($result) && !empty($result['adopted'])))
         {
             throw new \Exception(is_array($result) && !empty($result['error']) ? $result['error'] : Lang::absoluteT('sslConfigOrderFailed'));
         }
@@ -751,7 +733,7 @@ trait SslConfigurationActions
         if($installType === 'manual' && !empty($privateKey))
         {
             $response['private_key']     = $privateKey;
-            $response['private_key_handle'] = \ModulesGarden\TSSPlugin\App\Libs\PrivateKeyDownload::store((int)$serviceId, $privateKey);
+            $response['private_key_handle'] = \TSSPlugin\App\Libs\Certificates\PrivateKeyDownload::store((int)$serviceId, $privateKey);
         }
 
         return $response;

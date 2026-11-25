@@ -1,9 +1,9 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Migration;
+namespace TSSPlugin\App\Migration;
 
-use ModulesGarden\TSSPlugin\App\Libs\SSLTrustCenterApi;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
+use TSSPlugin\App\Libs\Gateway\SSLTrustCenterApi;
+use TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
 
 /**
  * Gateway credentials of the legacy modules, reused for this module.

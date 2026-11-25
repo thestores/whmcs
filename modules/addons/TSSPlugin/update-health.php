@@ -64,14 +64,14 @@ try
     }
 
     // the module's entry files run here, so an error in them is caught (WHMCS swallows errors of hooks.php)
-    require_once __DIR__ . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Bootstrap.php';
+    require_once __DIR__ . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Kernel' . DIRECTORY_SEPARATOR . 'Boot.php';
     include __DIR__ . DIRECTORY_SEPARATOR . 'hooks.php';
     require_once __DIR__ . DIRECTORY_SEPARATOR . 'TSSPlugin.php';
     if(is_file($server . DIRECTORY_SEPARATOR . 'TSSPlugin.php'))
     {
         require_once $server . DIRECTORY_SEPARATOR . 'TSSPlugin.php';
     }
-    $version = (string)\ModulesGarden\TSSPlugin\Core\Support\Facades\Config::get('configuration.version', '');
+    $version = \TSSPlugin\App\Kernel\Layout::version();
 
     if(($stored['mode'] ?? '') === 'upgrade')
     {
@@ -87,7 +87,7 @@ try
     }
 
     $answer = ['ok' => true, 'version' => $version, 'php' => PHP_VERSION,
-               'opcache_ok' => \ModulesGarden\TSSPlugin\App\Libs\Update\Preflight::opcacheOk()];
+               'opcache_ok' => \TSSPlugin\App\Libs\Update\Preflight::opcacheOk()];
 }
 catch(\Throwable $e)
 {

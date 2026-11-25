@@ -27,7 +27,7 @@
                 <svg class="tss-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4M12 16h.01"/></svg>
             </span>
             <div class="tss-hero__title">
-                <span class="tss-badge tss-badge--wait">{if $status == 'pending' || $status == 'processing'}{$MGLANG->T('validation_page', 'Validating')}{else}{$status|escape|capitalize}{/if}</span>
+                <span class="tss-badge tss-badge--wait">{if $status == 'pending' || $status == 'processing'}{$MGLANG->T('validation_page', 'Validating')}{elseif $statusLabel}{$statusLabel|escape}{else}{$status|replace:'_':' '|escape|capitalize}{/if}</span>
                 <h3>{$product_name|escape}</h3>
                 {if $domain}
                     <p class="tss-hero__domain">
@@ -38,7 +38,8 @@
             </div>
         </div>
         <div class="tss-hero__foot">
-            <p>{$product_title}</p>
+            {* a failed order can not be validated: only cancelled *}
+            {if $status != 'failed'}<p>{$product_title}</p>{/if}
             <div class="tss-actions">
                 {if $serviceOpen}
                     <button type="button" data-toggle="modal" data-target="#myModalCancel" class="tss-btn">
@@ -53,7 +54,12 @@
         </div>
     </section>
 
-    {* a CAA DNS record keeps the certificate authority from issuing (App\Libs\CaaCheck) *}
+    {* the order waits at the vendor side: failed, unpaid or not sent yet (CertificateSyncHelpers::NOTICE_STATUSES) *}
+    {if $vendorNotice}
+        <div class="alert alert-warning tss-vendor-notice" role="alert">{$vendorNotice|escape}</div>
+    {/if}
+
+    {* a CAA DNS record keeps the certificate authority from issuing (App\Libs\Certificates\CaaCheck) *}
     {if $caa_warning}{$caa_warning}{/if}
 
     <div class="tss-grid">
@@ -103,7 +109,7 @@
                 <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">{$MGLANG->T('validation_page', 'Download')} <span class="caret"></span></button>
                 <ul class="dropdown-menu">
                     {foreach $download_formats as $format}
-                        <li><a class="dropdown-item" href="clientarea.php?action=productdetails&id={$serviceid}&mg-action=download&format={$format}">{$MGLANG->T('download_formats', $format)}</a></li>
+                        <li><a class="dropdown-item" href="clientarea.php?action=productdetails&id={$serviceid}&mod-action=download&format={$format}">{$MGLANG->T('download_formats', $format)}</a></li>
                     {/foreach}
                 </ul>
             </div>
@@ -248,22 +254,22 @@
         </tbody>
     </table>
 
-    <a href="clientarea.php?action=productdetails&id={$serviceid}&mg-action=downloadCSR" class="btn btn-default">{$MGLANG->T('validation_page', 'Download CSR')}</a>
+    <a href="clientarea.php?action=productdetails&id={$serviceid}&mod-action=downloadCSR" class="btn btn-default">{$MGLANG->T('validation_page', 'Download CSR')}</a>
     {if $serviceOpen}
     {if $mainDomainMethod == 'http' || $mainDomainMethod == 'https'}
-        <a href="clientarea.php?action=productdetails&id={$serviceid}&mg-action=downloadAuthFile" class="btn btn-default">{$MGLANG->T('validation_page', 'Download Auth File')}</a>
+        <a href="clientarea.php?action=productdetails&id={$serviceid}&mod-action=downloadAuthFile" class="btn btn-default">{$MGLANG->T('validation_page', 'Download Auth File')}</a>
     {/if}
-    <a href="clientarea.php?action=productdetails&id={$serviceid}&mg-action=changeApprovalMethod" class="btn btn-default">{$MGLANG->T('validation_page', 'Change Approval Method')}</a>
+    <a href="clientarea.php?action=productdetails&id={$serviceid}&mod-action=changeApprovalMethod" class="btn btn-default">{$MGLANG->T('validation_page', 'Change Approval Method')}</a>
     {if $status == 'pending' || $status == 'processing'}
         <form method="POST" style="display:inline;">
-            <input type="hidden" name="mg-action" value="revalidate">
+            <input type="hidden" name="mod-action" value="revalidate">
             <input type="hidden" name="token" value="{$csrfToken}">
             <button type="submit" class="btn btn-primary" title="{$MGLANG->T('validation_page', 'RevalidateDesc')}">{$MGLANG->T('validation_page', 'Revalidate')}</button>
         </form>
     {/if}
     {if $hasEmailValidation && ($status == 'pending' || $status == 'processing')}
         <form method="POST" style="display:inline;">
-            <input type="hidden" name="mg-action" value="resendValidationEmail">
+            <input type="hidden" name="mod-action" value="resendValidationEmail">
             <input type="hidden" name="token" value="{$csrfToken}">
             <button type="submit" class="btn btn-default" title="{$MGLANG->T('validation_page', 'ResendDcvEmailDesc')}">{$MGLANG->T('validation_page', 'Resend DCV email')}</button>
         </form>
@@ -405,7 +411,7 @@
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <form method="POST">
-                <input type="hidden" name="mg-action" value="cancel">
+                <input type="hidden" name="mod-action" value="cancel">
                 <input type="hidden" name="token" value="{$csrfToken}">
                 <input type="hidden" name="remoteid" value="{$api_order_id}">
                 <div class="modal-header" style="display: block;">
@@ -429,7 +435,7 @@
     $(document).ready(function (){
         let clone_element = $('.validate-ssl-unified').clone();
         $('.product-details').html(clone_element);
-        $('.mg-module .validate-ssl-unified').remove();
+        $('.mod-module .validate-ssl-unified').remove();
         // the module's stylesheet lives in the block below and has to survive it
         $('head').append($('link[href*="theme.css"]').first());
         // WHMCS's own tab strip under the page: the module shows everything above it

@@ -1,8 +1,8 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Libs\Update;
+namespace TSSPlugin\App\Libs\Update;
 
-use ModulesGarden\TSSPlugin\Core\Support\Facades\Config;
+use TSSPlugin\App\Kernel\Layout;
 use WHMCS\Database\Capsule;
 
 /**
@@ -41,7 +41,7 @@ class State
     /** The version of the files that run now */
     public static function installedVersion()
     {
-        return (string)Config::get('configuration.version', '0');
+        return Layout::version();
     }
 
     /** One line in the update history (newest first, the last 20 kept) */

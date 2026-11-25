@@ -1,14 +1,14 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Migration;
+namespace TSSPlugin\App\Migration;
 
-use ModulesGarden\TSSPlugin\App\Libs\Markups;
-use ModulesGarden\TSSPlugin\App\Libs\Cpanel;
-use ModulesGarden\TSSPlugin\App\Libs\EmailCatalog;
-use ModulesGarden\TSSPlugin\App\Libs\EmailManager;
-use ModulesGarden\TSSPlugin\App\Libs\LegacyEmailImport;
-use ModulesGarden\TSSPlugin\App\Migration\Readers\LegacyReaderInterface;
-use ModulesGarden\TSSPlugin\App\Migration\Support\Schema;
+use TSSPlugin\App\Libs\Billing\Markups;
+use TSSPlugin\App\Libs\AutoInstall\Cpanel;
+use TSSPlugin\App\Libs\Emails\EmailCatalog;
+use TSSPlugin\App\Libs\Emails\EmailManager;
+use TSSPlugin\App\Libs\Emails\LegacyEmailImport;
+use TSSPlugin\App\Migration\Readers\LegacyReaderInterface;
+use TSSPlugin\App\Migration\Support\Schema;
 use WHMCS\Database\Capsule;
 
 /**
@@ -245,7 +245,7 @@ class Engine
     /**
      * Legacy products (and TSS order codes) the gateway has no product for, with the services that use them.
      * Each needs a choice before a run: an alternative gateway product (renewals are ordered as that product) or
-     * "keep as a record" (App\Libs\RecordOnly). Read without the run's choices.
+     * "keep as a record" (App\Libs\Certificates\RecordOnly). Read without the run's choices.
      * [['ref', 'label', 'names' => [], 'pids' => [], 'unsupported' => bool, 'services' => ['active', 'awaiting', 'other']]]
      */
     public function unmatched(): array
@@ -708,7 +708,7 @@ class Engine
                 // only slower without it
             }
         }
-        // the unified module's own table: kept (App\Libs\SchemaIndexes adds the same on every install)
+        // the unified module's own table: kept (App\Database\Schema adds the same on every install)
         try
         {
             Schema::addIndex(Writer::tRequests(), 'serviceid', 'serviceid');
@@ -872,7 +872,7 @@ class Engine
                 $productRemote = trim((string)Capsule::table('tblproducts')->where('id', $pid)->value('configoption2'));
                 if($productRemote !== '')
                 {
-                    $rec['order_payload']['product']['id'] = \ModulesGarden\TSSPlugin\App\Migration\Readers\AbstractReader::productIdValue($productRemote);
+                    $rec['order_payload']['product']['id'] = \TSSPlugin\App\Migration\Readers\AbstractReader::productIdValue($productRemote);
                     if(isset($rec['certificate']) && is_array($rec['certificate']) && array_key_exists('remote_product_id', $rec['certificate']) && (string)$rec['certificate']['remote_product_id'] === '')
                     {
                         $rec['certificate']['remote_product_id'] = $productRemote;
@@ -1321,7 +1321,7 @@ class Engine
         $mysql   = Capsule::selectOne('SELECT VERSION() AS v');
         $summary = $run['summary'] ?? [];
         $lines   = [
-            \ModulesGarden\TSSPlugin\App\Libs\Edition::name() . ' - migration error report',
+            \TSSPlugin\App\Libs\Support\Edition::name() . ' - migration error report',
             str_repeat('=', 60),
             'Run:            #' . $runId . ' (' . strtoupper((string)$run['source']) . ', legacy module ' . ($run['source_version'] ?: '?') . ')',
             'Status:         ' . $run['status'],

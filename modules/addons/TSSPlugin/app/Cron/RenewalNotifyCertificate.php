@@ -1,31 +1,24 @@
 <?php
 
-namespace ModulesGarden\TSSPlugin\App\Cron;
+namespace TSSPlugin\App\Cron;
 
-use Exception;
-use ModulesGarden\Servers\TSSPlugin\app\services\InvoiceRenew;
-use ModulesGarden\TSSPlugin\App\Helpers\EmailTemplates;
-use ModulesGarden\TSSPlugin\App\Libs\AcmeHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\AutoInstallHelpers;
-use ModulesGarden\TSSPlugin\App\Libs\Helpers;
-use ModulesGarden\TSSPlugin\App\Models\AcmeSubscription;
-use ModulesGarden\TSSPlugin\App\Models\CronCheck;
-use ModulesGarden\TSSPlugin\App\Models\Request;
-use ModulesGarden\TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
-use ModulesGarden\TSSPlugin\Core\CommandLine\AbstractCommand;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Helper;
-use ModulesGarden\TSSPlugin\Core\WHMCS\Models\Service;
-use ModulesGarden\TSSPlugin\Packages\Logs\Support\Facades\Logger;
+use TSSPlugin\App\Helpers\EmailTemplates;
+use TSSPlugin\App\Libs\AutoInstall\AutoInstallHelpers;
+use TSSPlugin\App\Models\CronCheck;
+use TSSPlugin\App\Models\Request;
+use TSSPlugin\App\Repositories\Whmcs\AddonModuleRepository;
+use TSSPlugin\App\Kernel\Console\Command;
+use TSSPlugin\App\Models\Whmcs\Service;
+use TSSPlugin\App\Libs\Logs\Logger;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use WHMCS\Database\Capsule;
 
 /**
  * Class Sample
- * @package ModulesGarden\TSSPlugin\App\Cron
+ * @package TSSPlugin\App\Cron
  */
-class RenewalNotifyCertificate extends AbstractCommand
+class RenewalNotifyCertificate extends Command
 {
     /**
      * Command name
@@ -74,9 +67,9 @@ class RenewalNotifyCertificate extends AbstractCommand
         $addonConfig = (new AddonModuleRepository())->getModuleConfiguration();
         $sslSettings = $addonConfig['sslSettings'];
 
-        // renewal invoices: from N days before the order end (App\Libs\RenewalPolicy); the module is the only one
+        // renewal invoices: from N days before the order end (App\Libs\Billing\RenewalPolicy); the module is the only one
         // that creates them, whichever way a paid renewal is placed
-        $auto_renew_invoice_reccuring           = \ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::invoicing(\ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::CERTIFICATE);
+        $auto_renew_invoice_reccuring           = \TSSPlugin\App\Libs\Billing\RenewalPolicy::invoicing(\TSSPlugin\App\Libs\Billing\RenewalPolicy::CERTIFICATE);
         $send_expiration_notification_reccuring = $sslSettings['recurringSendExpirationNotifications'];
 
         $daysNotify = explode(',', $send_expiration_notification_reccuring);
@@ -90,12 +83,12 @@ class RenewalNotifyCertificate extends AbstractCommand
                                     ->where(function($query) {
                                         $query->where('tblsslorders.status', 'Configuration Submitted')
                                               ->orWhere(function($smime) {
-                                                  $smime->whereIn('tblproducts.configoption9', \ModulesGarden\TSSPlugin\App\Libs\GatewayOrderService::categories())
+                                                  $smime->whereIn('tblproducts.configoption9', \TSSPlugin\App\Libs\ProductLines\GatewayOrderService::categories())
                                                         ->where('tblsslorders.status', 'Completed');
                                               });
                                     });
-        // certificates kept as a record of the legacy module are never renewed (App\Libs\RecordOnly)
-        \ModulesGarden\TSSPlugin\App\Libs\RecordOnly::exclude($certificatesQuery);
+        // certificates kept as a record of the legacy module are never renewed (App\Libs\Certificates\RecordOnly)
+        \TSSPlugin\App\Libs\Certificates\RecordOnly::exclude($certificatesQuery);
 
 
         $output->write('Start checking certificates...') .
@@ -116,12 +109,12 @@ class RenewalNotifyCertificate extends AbstractCommand
         foreach($certificatesQuery->get() as $srv)
         {
             // subscriptions have their own renewal (SubscriptionRenewals)
-            if(\ModulesGarden\TSSPlugin\App\Libs\SubscriptionBilling::isSubscriptionProduct($srv->packageid))
+            if(\TSSPlugin\App\Libs\Subscriptions\SubscriptionBilling::isSubscriptionProduct($srv->packageid))
             {
                 continue;
             }
             // S/MIME: its own expiry e-mail, no reissue reminder (a renewal is a new order)
-            $gatewayType = \ModulesGarden\TSSPlugin\App\Libs\GatewayOrderService::typeOfProduct($srv->packageid);
+            $gatewayType = \TSSPlugin\App\Libs\ProductLines\GatewayOrderService::typeOfProduct($srv->packageid);
             $isSmime     = $gatewayType !== null;
 
             $io->progressAdvance(1);
@@ -152,11 +145,11 @@ class RenewalNotifyCertificate extends AbstractCommand
                         // code signing and S/MIME have their own expiry text; a CodeGuard licence is not a certificate,
                         // so it gets the general service expiry e-mail
                         $expiryTemplate = EmailTemplates::EXPIRATION_TEMPLATE;
-                        if($gatewayType === \ModulesGarden\TSSPlugin\App\Libs\CodeSigningService::class)
+                        if($gatewayType === \TSSPlugin\App\Libs\ProductLines\CodeSigningService::class)
                         {
                             $expiryTemplate = EmailTemplates::CS_EXPIRATION_TEMPLATE;
                         }
-                        elseif($gatewayType === \ModulesGarden\TSSPlugin\App\Libs\SmimeService::class)
+                        elseif($gatewayType === \TSSPlugin\App\Libs\ProductLines\SmimeService::class)
                         {
                             $expiryTemplate = EmailTemplates::SMIME_EXPIRATION_TEMPLATE;
                         }
@@ -169,7 +162,7 @@ class RenewalNotifyCertificate extends AbstractCommand
                 // the service falls due on the order end: its renewal invoice is created from N days before it, on or
                 // after that day (a day without a cron run loses nothing; an invoice that exists is not made again)
                 if($auto_renew_invoice_reccuring && !in_array($srv->billingcycle, ['One Time', 'Free Account'], true)
-                    && \ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::invoiceDue(\ModulesGarden\TSSPlugin\App\Libs\RenewalPolicy::CERTIFICATE, $srv->nextduedate))
+                    && \TSSPlugin\App\Libs\Billing\RenewalPolicy::invoiceDue(\TSSPlugin\App\Libs\Billing\RenewalPolicy::CERTIFICATE, $srv->nextduedate))
                 {
                     $packageLists[$srv->packageid][] = $srv;
                     $serviceIDs[]                    = $srv->id;
@@ -185,7 +178,7 @@ class RenewalNotifyCertificate extends AbstractCommand
                     $failedIds[] = (int)$srv->id;
                 }
                 $errorToDB = $e->getMessage();
-                Logger::error("The notification error " . $e->getMessage(), \ModulesGarden\TSSPlugin\App\Libs\LogContext::exception($e, ['service' => $srv->id]));
+                Logger::error("The notification error " . $e->getMessage(), \TSSPlugin\App\Libs\Support\LogContext::exception($e, ['service' => $srv->id]));
 
             }
         }
@@ -196,14 +189,14 @@ class RenewalNotifyCertificate extends AbstractCommand
         {
             $output->write('Invoice Checking...');
 
-            $classExist = class_exists('\ModulesGarden\Servers\TSSPlugin\app\services\InvoiceRenew');
+            $classExist = class_exists('\TSSPlugin\Server\app\services\InvoiceRenew');
             if($classExist === false)
             {
                 require_once dirname(dirname(dirname(dirname(__DIR__)))) . DIRECTORY_SEPARATOR . 'servers' . DIRECTORY_SEPARATOR . 'TSSPlugin' . DIRECTORY_SEPARATOR . 'Loader.php';
-                new \ModulesGarden\Servers\TSSPlugin\Loader();
+                new \TSSPlugin\Server\Loader();
             }
 
-            $invoice = new \ModulesGarden\Servers\TSSPlugin\app\services\InvoiceRenew();
+            $invoice = new \TSSPlugin\Server\app\services\InvoiceRenew();
             foreach($serviceIDs as $serviceID)
             {
                 try
@@ -217,7 +210,7 @@ class RenewalNotifyCertificate extends AbstractCommand
                 {
 
                     $errorToDB = $e->getMessage();
-                    Logger::error("The renewal invoice generate error " . $e->getMessage(), \ModulesGarden\TSSPlugin\App\Libs\LogContext::exception($e, ['service' => $serviceID]));
+                    Logger::error("The renewal invoice generate error " . $e->getMessage(), \TSSPlugin\App\Libs\Support\LogContext::exception($e, ['service' => $serviceID]));
 
                 }
             }
@@ -227,7 +220,7 @@ class RenewalNotifyCertificate extends AbstractCommand
         $io->progressFinish();
         try
         {
-            foreach(\ModulesGarden\TSSPlugin\App\Libs\SubscriptionRenewals::run($sslSettings) as $serviceId => $error)
+            foreach(\TSSPlugin\App\Libs\Subscriptions\SubscriptionRenewals::run($sslSettings) as $serviceId => $error)
             {
                 $errorToDB = $error;
                 Logger::error('Subscription renewal error ' . $error, ['service' => $serviceId]);
@@ -236,11 +229,11 @@ class RenewalNotifyCertificate extends AbstractCommand
         catch(\Throwable $e)
         {
             $errorToDB = $e->getMessage();
-            Logger::error('Subscription renewal error ' . $e->getMessage(), \ModulesGarden\TSSPlugin\App\Libs\LogContext::exception($e));
+            Logger::error('Subscription renewal error ' . $e->getMessage(), \TSSPlugin\App\Libs\Support\LogContext::exception($e));
         }
 
         // each step on its own: the time of this run is always saved, or the job would start again every 5 minutes
-        foreach(['terminateUnpaid', 'closeRenewed'] as $step)
+        foreach(['closeRenewed'] as $step)
         {
             try
             {
@@ -249,7 +242,7 @@ class RenewalNotifyCertificate extends AbstractCommand
             catch(\Throwable $e)
             {
                 $errorToDB = $e->getMessage();
-                Logger::error('RenewalNotifyCertificate ' . $step . ' error ' . $e->getMessage(), \ModulesGarden\TSSPlugin\App\Libs\LogContext::exception($e));
+                Logger::error('RenewalNotifyCertificate ' . $step . ' error ' . $e->getMessage(), \TSSPlugin\App\Libs\Support\LogContext::exception($e));
             }
         }
 
@@ -258,11 +251,6 @@ class RenewalNotifyCertificate extends AbstractCommand
             ['last_run' => date('Y-m-d H:i:s'), 'last_error' => $errorToDB]
         );
 
-    }
-
-    private function terminateUnpaid()
-    {
-        \ModulesGarden\TSSPlugin\App\Libs\UnpaidTermination::run();
     }
 
     /**
@@ -280,12 +268,12 @@ class RenewalNotifyCertificate extends AbstractCommand
             {
                 continue;
             }
-            $stored = \ModulesGarden\TSSPlugin\App\Libs\CertificateService::stored($serviceId);
-            $end    = \ModulesGarden\TSSPlugin\App\Libs\SslProductHelpers::getServiceDueDate((array)($stored['orderData'] ?? []));
+            $stored = \TSSPlugin\App\Libs\Certificates\CertificateService::stored($serviceId);
+            $end    = \TSSPlugin\App\Libs\Products\SslProductHelpers::getServiceDueDate((array)($stored['orderData'] ?? []));
             if($end && $end < $today)
             {
                 \WHMCS\Database\Capsule::table('tblhosting')->where('id', $serviceId)->update(['domainstatus' => 'Completed']);
-                \ModulesGarden\TSSPlugin\App\Libs\CertificateService::event($serviceId, 'info', '[Renewal] Order ended on ' . $end . ': service completed, renewed as service #' . (int)$row->request);
+                \TSSPlugin\App\Libs\Certificates\CertificateService::event($serviceId, 'info', '[Renewal] Order ended on ' . $end . ': service completed, renewed as service #' . (int)$row->request);
             }
         }
     }

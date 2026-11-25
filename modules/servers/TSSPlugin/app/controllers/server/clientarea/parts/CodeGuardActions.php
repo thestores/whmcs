@@ -1,12 +1,12 @@
 <?php
 
-namespace ModulesGarden\Servers\TSSPlugin\app\controllers\server\clientarea\parts;
+namespace TSSPlugin\Server\app\controllers\server\clientarea\parts;
 
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\Product;
-use ModulesGarden\Servers\TSSPlugin\app\models\whmcs\SSL;
-use ModulesGarden\Servers\TSSPlugin\core\Lang;
-use ModulesGarden\Servers\TSSPlugin\Server;
-use ModulesGarden\TSSPlugin\App\Libs\CodeGuardService;
+use TSSPlugin\Server\app\models\whmcs\Product;
+use TSSPlugin\Server\app\models\whmcs\SSL;
+use TSSPlugin\Server\core\Lang;
+use TSSPlugin\Server\Server;
+use TSSPlugin\App\Libs\ProductLines\CodeGuardService;
 use WHMCS\Database\Capsule;
 
 /**
@@ -19,7 +19,7 @@ trait CodeGuardActions
      * CodeGuard service page. There is no order form: the licence is created with the service, so the page shows the
      * licence and the button into the dashboard, and offers to order again only if the first attempt failed.
      */
-    private function indexCodeGuardHTML($input, $vars = array())
+    private function indexCodeGuardHTML($input, $vars = [])
     {
         $serviceId = (int)$input['params']['serviceid'];
         $ssl       = SSL::getByServiceId($serviceId);
@@ -70,7 +70,7 @@ trait CodeGuardActions
     /**
      * One-time link into the CodeGuard dashboard: asked for on every click, never stored, and opened by the browser.
      */
-    public function openCodeGuardDashboardJSON($input, $vars = array())
+    public function openCodeGuardDashboardJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
         $serviceId = (int)$input['params']['serviceid'];
@@ -82,7 +82,7 @@ trait CodeGuardActions
         return ['success' => true, 'link' => CodeGuardService::ssoLink($serviceId), 'message' => Lang::absoluteT('serverCA', 'home', 'codeGuardDashboardOpened')];
     }
 
-    public function refreshCodeGuardDetailsJSON($input, $vars = array())
+    public function refreshCodeGuardDetailsJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
         $serviceId = (int)$input['params']['serviceid'];
@@ -98,7 +98,7 @@ trait CodeGuardActions
     /**
      * Changes the administrator contact of the licence (name and e-mail address CodeGuard writes to).
      */
-    public function updateCodeGuardContactJSON($input, $vars = array())
+    public function updateCodeGuardContactJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
         $serviceId = (int)$input['params']['serviceid'];
@@ -119,7 +119,7 @@ trait CodeGuardActions
     /**
      * Orders the licence after the order placed with the service failed (the page offers this only then).
      */
-    public function createCodeGuardJSON($input, $vars = array())
+    public function createCodeGuardJSON($input, $vars = [])
     {
         $this->requireCsrfToken();
         // requireOrderableService takes the per-service lock on $input['id'], so it is released on the same value
