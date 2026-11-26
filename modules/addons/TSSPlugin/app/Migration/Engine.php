@@ -958,7 +958,7 @@ class Engine
                 $current = Capsule::table('tblsslorders')->where('id', (int)$job['ssl_order_id'])->value('status');
                 if($current && $current !== 'Awaiting Configuration')
                 {
-                    $writer->undoService($job['data']);
+                    $writer->undoService($job['data'], (int)$job['object_id']);
                     Capsule::table(Store::jobsTable())->where('id', $job['id'])->update(['status' => Store::JOB_PENDING, 'updated_at' => date('Y-m-d H:i:s')]);
                     $this->migrateService($runId, $job['id'], (int)$job['object_id'], $writer, $products, (bool)$run['options']['fetch_cpanel_keys']);
                     $changed++;
@@ -1181,7 +1181,7 @@ class Engine
         Capsule::connection()->transaction(function() use ($runId, $run, $backup, $reader, $writer) {
             foreach(Store::jobsByStatus($runId, Store::KIND_SERVICE, Store::JOB_DONE) as $job)
             {
-                $writer->undoService($job['data']);
+                $writer->undoService($job['data'], (int)$job['object_id']);
             }
             // markup rules created by the run (settings and product jobs)
             $markupIds = [];
@@ -1380,7 +1380,7 @@ class Engine
         fputcsv($out, ['time', 'level', 'phase', 'service_id', 'message', 'context']);
         foreach(Store::logRows($runId, 100000) as $row)
         {
-            fputcsv($out, [$row['created_at'], $row['level'], $row['phase'], $row['service_id'], $row['message'], (string)$row['context']]);
+            fputcsv($out, \TSSPlugin\App\Libs\Support\Csv::row([$row['created_at'], $row['level'], $row['phase'], $row['service_id'], $row['message'], (string)$row['context']]));
         }
         rewind($out);
 
