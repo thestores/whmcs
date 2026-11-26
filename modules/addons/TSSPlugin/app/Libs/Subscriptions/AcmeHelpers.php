@@ -4,7 +4,7 @@ namespace TSSPlugin\App\Libs\Subscriptions;
 
 
 use TSSPlugin\Server\app\models\whmcs\SSL;
-use TSSPlugin\Server\core\Lang;
+use TSSPlugin\Server\Text;
 use TSSPlugin\App\Models\AcmeSubscription;
 use TSSPlugin\App\Models\RemoteProduct;
 use TSSPlugin\App\Models\Whmcs\Product;
@@ -192,7 +192,7 @@ class AcmeHelpers
 
         if(!$subscription || (int)$subscription->api_order_id <= 0)
         {
-            throw new \Exception(Lang::absoluteT('subscription_was_not_created_yet'));
+            throw new \Exception(Text::get('subscription_was_not_created_yet'));
         }
 
         $wasUnpaid  = SubscriptionState::renewalUnpaid($subscription);

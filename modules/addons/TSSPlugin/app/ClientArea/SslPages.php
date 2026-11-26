@@ -2,7 +2,7 @@
 
 namespace TSSPlugin\App\ClientArea;
 
-use TSSPlugin\Server\core\Lang;
+use TSSPlugin\Server\Text;
 use TSSPlugin\App\Libs\Certificates\ClientSslSummary;
 use TSSPlugin\App\Libs\Support\GeneralSettings;
 
@@ -174,7 +174,7 @@ class SslPages
         $texts = [];
         foreach($keys as $key)
         {
-            $texts[$key] = Lang::absoluteT('clientPages', $key);
+            $texts[$key] = Text::get('clientPages', $key);
         }
 
         return $texts;
@@ -191,7 +191,7 @@ class SslPages
         $texts = [];
         foreach(self::TOOL_TEXTS as $key)
         {
-            $texts[$key] = Lang::absoluteT('sslTools', $key);
+            $texts[$key] = Text::get('sslTools', $key);
         }
 
         return $texts;
@@ -206,16 +206,7 @@ class SslPages
 
     protected static function bootLang()
     {
-        if(!class_exists('\TSSPlugin\Server\Loader', false))
-        {
-            require_once dirname(__DIR__, 4) . DIRECTORY_SEPARATOR . 'servers' . DIRECTORY_SEPARATOR . 'TSSPlugin' . DIRECTORY_SEPARATOR . 'Loader.php';
-            new \TSSPlugin\Server\Loader();
-        }
-        if(!defined('DS'))
-        {
-            define('DS', DIRECTORY_SEPARATOR);
-        }
-        // The server module kernel loads its language files (english + client's language + langs/overrides)
-        \TSSPlugin\Server\Server::I();
+        // the client texts are the server module's (english + the client's language + langs/overrides)
+        require_once dirname(__DIR__, 4) . DIRECTORY_SEPARATOR . 'servers' . DIRECTORY_SEPARATOR . 'TSSPlugin' . DIRECTORY_SEPARATOR . 'Boot.php';
     }
 }

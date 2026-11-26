@@ -136,16 +136,16 @@ class RecordOnly
         $text = '';
         try
         {
-            if(class_exists('\TSSPlugin\Server\core\Lang'))
+            if(class_exists('\TSSPlugin\Server\Text'))
             {
-                $text = html_entity_decode((string)\TSSPlugin\Server\core\Lang::absoluteT('recordOnly', $key), ENT_QUOTES, 'UTF-8');
+                $text = (string)\TSSPlugin\Server\Text::plain('recordOnly', $key);
             }
         }
         catch(\Throwable $e)
         {
             $text = '';
         }
-        if($text === '' || $text === $key || strpos($text, 'recordOnly') !== false || strpos($text, '_LANG[') !== false)
+        if($text === '')
         {
             $text = self::ENGLISH[$key] ?? $key;
         }

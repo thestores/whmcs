@@ -27,6 +27,6 @@ class AdminDownloads
             return; // another module's service (both editions can be installed side by side)
         }
         \check_token('WHMCS.admin.default');
-        \TSSPlugin\Server\app\controllers\server\admin\Actions::adminDownload($serviceId, (string)$_GET['tss_download']);
+        \TSSPlugin\Server\app\Admin\Actions::adminDownload($serviceId, (string)$_GET['tss_download']);
     }
 }

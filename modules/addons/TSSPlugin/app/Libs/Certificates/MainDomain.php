@@ -315,16 +315,16 @@ class MainDomain
         $text = '';
         try
         {
-            if(class_exists('\TSSPlugin\Server\core\Lang'))
+            if(class_exists('\TSSPlugin\Server\Text'))
             {
-                $text = html_entity_decode((string)\TSSPlugin\Server\core\Lang::absoluteT('mainDomain', $key), ENT_QUOTES, 'UTF-8');
+                $text = (string)\TSSPlugin\Server\Text::plain('mainDomain', $key);
             }
         }
         catch(\Throwable $e)
         {
             $text = '';
         }
-        if($text === '' || $text === $key || strpos($text, 'mainDomain') !== false || strpos($text, '_LANG[') !== false)
+        if($text === '')
         {
             $text = self::ENGLISH[$key] ?? $key;
         }

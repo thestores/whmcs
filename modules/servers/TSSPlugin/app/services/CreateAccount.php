@@ -4,7 +4,6 @@ namespace TSSPlugin\Server\app\services;
 
 use TSSPlugin\Server\app\models\whmcs\SSL;
 use TSSPlugin\Server\app\repository\whmcs\Config;
-use TSSPlugin\Server\Configuration;
 use TSSPlugin\App\Helpers\EmailTemplates;
 use TSSPlugin\App\Libs\Subscriptions\AcmeHelpers;
 
@@ -34,7 +33,7 @@ class CreateAccount {
         if (!is_null($serviceSSL)) {
             // A migrated legacy service ("setup on order" products) already has its row: adopt it instead of failing
             if ($serviceSSL->status === 'Awaiting Configuration' && empty($serviceSSL->remoteid)) {
-                SSL::where('id', $serviceSSL->id)->update(['module' => (new Configuration())->systemName]);
+                SSL::where('id', $serviceSSL->id)->update(['module' => basename(dirname(__DIR__, 2))]);
                 $sslId = $serviceSSL->id;
             } else {
                 throw new \Exception('The SSL order has already been created');
@@ -44,7 +43,7 @@ class CreateAccount {
                 'userid' => $userId,
                 'serviceid' => $serviceId,
                 'remoteid' => '',
-                'module' => (new Configuration())->systemName,
+                'module' => basename(dirname(__DIR__, 2)),
                 'certtype' => '',
                 'completiondate' => '',
                 'status' => 'Awaiting Configuration'

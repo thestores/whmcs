@@ -12,10 +12,11 @@ class AwaitingConfigurationNotice
     public static function handle($params)
     {
 
-        if($params['clientareaaction'] == 'services' || $params['clientareaaction'] == 'products')
+        // pages other than the client area lists have no clientareaaction
+        if(in_array($params['clientareaaction'] ?? '', ['services', 'products'], true) && !empty($_SESSION['uid']))
         {
 
-            $moduleName = (new \TSSPlugin\Server\Configuration())->systemName;
+            $moduleName = basename(dirname(__DIR__, 2));
             $services   = Capsule::table('tblhosting')
                                  ->select(['tblhosting.id'])
                                  ->join('tblproducts', 'tblproducts.id', '=', 'tblhosting.packageid')
